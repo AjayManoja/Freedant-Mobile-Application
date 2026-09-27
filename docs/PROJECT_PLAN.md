@@ -61,6 +61,7 @@ flowchart TB
 **Communication rule:** events by default; a synchronous call only when an immediate answer is needed (e.g. Competition asking Payment to create an order). Every synchronous call has a timeout.
 
 **Consistency patterns (mandatory):**
+
 - **Transactional outbox** — events are written to an `outbox` table in the same transaction as the data change, then relayed to RabbitMQ.
 - **Idempotent consumers** — every handler records processed event IDs and ignores duplicates.
 - **Saga for join & pay** — spot hold → order → signed webhook → `payment.captured` → registration confirmed; failure paths release the spot or refund a late payment.
@@ -106,7 +107,7 @@ Real video streaming, KYC, GST invoicing, real-money operation. Paid-entry conte
 
 Planning and design happen once up front. Build, test and deploy then repeat in one-week sprints. Operations continue after launch.
 
-```
+```text
 Phase 0 Plan ─► Phase 1 Design ─► Phase 2 Foundation ─► [ weekly sprint loop: plan → build → test → review → deploy → retro ] ─► Phase 6 Operate
 ```
 

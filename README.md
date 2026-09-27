@@ -31,7 +31,7 @@ flowchart TB
 
 ## Repository structure
 
-```
+```text
 apps/mobile/            Expo React Native app
 services/               NestJS microservices (one folder per service)
 packages/shared/        Shared config, logger, errors, event contracts, outbox
