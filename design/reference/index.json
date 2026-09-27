@@ -1,0 +1,175 @@
+{
+  "capturedAt": "2026-09-27T15:01:48.590106Z",
+  "viewport": "430x932 @2x",
+  "count": 28,
+  "routes": [
+    {
+      "route": "/",
+      "name": "home",
+      "html": "reference/html/home.html",
+      "screenshot": "reference/screenshots/home.png"
+    },
+    {
+      "route": "/login",
+      "name": "login",
+      "html": "reference/html/login.html",
+      "screenshot": "reference/screenshots/login.png"
+    },
+    {
+      "route": "/signup",
+      "name": "signup",
+      "html": "reference/html/signup.html",
+      "screenshot": "reference/screenshots/signup.png"
+    },
+    {
+      "route": "/verify",
+      "name": "verify",
+      "html": "reference/html/verify.html",
+      "screenshot": "reference/screenshots/verify.png"
+    },
+    {
+      "route": "/forgot-password",
+      "name": "forgot-password",
+      "html": "reference/html/forgot-password.html",
+      "screenshot": "reference/screenshots/forgot-password.png"
+    },
+    {
+      "route": "/competitions",
+      "name": "competitions-list",
+      "html": "reference/html/competitions-list.html",
+      "screenshot": "reference/screenshots/competitions-list.png"
+    },
+    {
+      "route": "/competitions/feedants-classical-dance",
+      "name": "competition-detail",
+      "html": "reference/html/competition-detail.html",
+      "screenshot": "reference/screenshots/competition-detail.png"
+    },
+    {
+      "route": "/competitions/feedants-classical-dance/results",
+      "name": "leaderboard",
+      "html": "reference/html/leaderboard.html",
+      "screenshot": "reference/screenshots/leaderboard.png"
+    },
+    {
+      "route": "/search",
+      "name": "search",
+      "html": "reference/html/search.html",
+      "screenshot": "reference/screenshots/search.png"
+    },
+    {
+      "route": "/wallet",
+      "name": "wallet",
+      "html": "reference/html/wallet.html",
+      "screenshot": "reference/screenshots/wallet.png"
+    },
+    {
+      "route": "/refer",
+      "name": "refer",
+      "html": "reference/html/refer.html",
+      "screenshot": "reference/screenshots/refer.png"
+    },
+    {
+      "route": "/explore",
+      "name": "explore",
+      "html": "reference/html/explore.html",
+      "screenshot": "reference/screenshots/explore.png"
+    },
+    {
+      "route": "/explore/trending",
+      "name": "list-trending",
+      "html": "reference/html/list-trending.html",
+      "screenshot": "reference/screenshots/list-trending.png"
+    },
+    {
+      "route": "/explore/ending",
+      "name": "list-ending",
+      "html": "reference/html/list-ending.html",
+      "screenshot": "reference/screenshots/list-ending.png"
+    },
+    {
+      "route": "/notifications",
+      "name": "notifications",
+      "html": "reference/html/notifications.html",
+      "screenshot": "reference/screenshots/notifications.png"
+    },
+    {
+      "route": "/messages",
+      "name": "messages",
+      "html": "reference/html/messages.html",
+      "screenshot": "reference/screenshots/messages.png"
+    },
+    {
+      "route": "/messages/meera",
+      "name": "chat-thread",
+      "html": "reference/html/chat-thread.html",
+      "screenshot": "reference/screenshots/chat-thread.png"
+    },
+    {
+      "route": "/host",
+      "name": "host",
+      "html": "reference/html/host.html",
+      "screenshot": "reference/screenshots/host.png"
+    },
+    {
+      "route": "/submissions",
+      "name": "my-submissions",
+      "html": "reference/html/my-submissions.html",
+      "screenshot": "reference/screenshots/my-submissions.png"
+    },
+    {
+      "route": "/my-competitions",
+      "name": "my-competitions",
+      "html": "reference/html/my-competitions.html",
+      "screenshot": "reference/screenshots/my-competitions.png"
+    },
+    {
+      "route": "/live",
+      "name": "live",
+      "html": "reference/html/live.html",
+      "screenshot": "reference/screenshots/live.png"
+    },
+    {
+      "route": "/profile",
+      "name": "profile",
+      "html": "reference/html/profile.html",
+      "screenshot": "reference/screenshots/profile.png"
+    },
+    {
+      "route": "/settings",
+      "name": "settings",
+      "html": "reference/html/settings.html",
+      "screenshot": "reference/screenshots/settings.png"
+    },
+    {
+      "route": "/help",
+      "name": "help",
+      "html": "reference/html/help.html",
+      "screenshot": "reference/screenshots/help.png"
+    },
+    {
+      "route": "/about",
+      "name": "about",
+      "html": "reference/html/about.html",
+      "screenshot": "reference/screenshots/about.png"
+    },
+    {
+      "route": "/legal/terms",
+      "name": "legal-terms",
+      "html": "reference/html/legal-terms.html",
+      "screenshot": "reference/screenshots/legal-terms.png"
+    },
+    {
+      "route": "/legal/privacy",
+      "name": "legal-privacy",
+      "html": "reference/html/legal-privacy.html",
+      "screenshot": "reference/screenshots/legal-privacy.png"
+    },
+    {
+      "route": "/winners/Manju Dubey",
+      "name": "winner-profile",
+      "html": "reference/html/winner-profile.html",
+      "screenshot": "reference/screenshots/winner-profile.png"
+    }
+  ]
+}

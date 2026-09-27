@@ -1,0 +1,13 @@
+/* Feedants design tokens — Tailwind CSS v4 @theme block.
+   This is the exact contract from src/index.css. Drop into your global CSS
+   (after `@import url(...Poppins...)` and `@import 'tailwindcss';`). */
+
+@theme {
+  --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+  --color-teal: #0d8074;
+  --color-teal-dark: #0a6b60;
+  --color-ink: #1b2b3a;
+  --color-slate: #6b7d8c;
+  --color-mint: #e8f5f1;
+  --color-canvas: #f2f4f5;
+}

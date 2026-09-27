@@ -1,0 +1,40 @@
+name: Bug report
+description: Something is not working as expected
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What was expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: dropdown
+    id: env
+    attributes:
+      label: Environment
+      options: [local, CI, staging, production]
+    validations:
+      required: true
+  - type: input
+    id: trace
+    attributes:
+      label: Request ID / trace ID
+      description: From the error response or logs, if available
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      render: shell

@@ -1,0 +1,26 @@
+# Normalize line endings to LF in the repo (shell scripts, Dockerfiles and
+# Nginx configs break with CRLF inside Linux containers).
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files — never diff or normalize
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+*.ttf  binary
+*.otf  binary
+*.woff binary
+*.woff2 binary
+*.mp4  binary
+
+# Generated / vendored — collapse in GitHub diffs and language stats
+pnpm-lock.yaml linguist-generated=true
+design/** linguist-documentation=true
