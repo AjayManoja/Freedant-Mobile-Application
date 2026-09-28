@@ -17,11 +17,6 @@
   - `inbox_events` — every consumed event's ID is recorded here inside the *same transaction* as the side effect it causes, so a redelivered event is a no-op (idempotent consumer, NFR-RL-03).
 - Soft-delete only where required for retention (`users`, via `status = DELETED` — FR-ID-09); everything else is hard rows with immutable history (ledger, outbox).
 
-```mermaid
-erDiagram
-  direction LR
-```
-
 ## 2. Identity service — `identity_db`
 
 ```mermaid
@@ -171,7 +166,7 @@ erDiagram
 
   SUBMISSIONS {
     uuid id PK
-    uuid registration_id FK UK "one submission per registration, A-25"
+    uuid registration_id "FK, UK" "one submission per registration, A-25"
     uuid competition_id FK
     uuid creator_id
     text media_url "nullable until uploaded"
