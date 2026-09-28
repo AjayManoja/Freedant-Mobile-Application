@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved — 2026-09-27 |
-| **Current phase** | Phase 0 — Planning & requirements |
+| **Current phase** | Phase 1 — Design (in progress; see [docs/02-design/](02-design/)) |
 | **Product context** | [design/prototype/docs/AboutProject.md](../design/prototype/docs/AboutProject.md) |
 
 ## Goal
