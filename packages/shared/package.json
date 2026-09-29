@@ -1,0 +1,27 @@
+{
+  "name": "@feedants/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Framework-free rules, schemas and event contracts shared by services and the mobile app",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "react-native": "src/index.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "jest"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.5.2",
+    "typescript": "~5.9.3"
+  }
+}

@@ -1,0 +1,253 @@
+# Local development stack.
+#
+#   docker compose -f infra/docker/compose.yaml up -d                 # infrastructure only
+#   docker compose -f infra/docker/compose.yaml --profile app up -d   # + all services behind Nginx
+#
+# Infrastructure ports are bound to 127.0.0.1 so `pnpm dev` on the host can reach them; the
+# production stack (Phase 5) publishes nothing except Nginx (NFR-SC-01).
+# Values come from infra/docker/.env (copy .env.example); nothing secret is committed.
+
+name: feedants
+
+x-service: &service
+  profiles: [app]
+  build:
+    context: ../..
+    dockerfile: infra/docker/service.Dockerfile
+  restart: unless-stopped
+  env_file: [.env]
+  networks: [internal]
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: [no-new-privileges:true]
+  healthcheck:
+    test:
+      [
+        'CMD',
+        'node',
+        '-e',
+        "fetch('http://127.0.0.1:'+process.env.PORT+'/health/live').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+      ]
+    interval: 10s
+    timeout: 3s
+    retries: 5
+  deploy:
+    resources:
+      limits: { memory: 256m }
+
+x-migrate: &migrate
+  profiles: [app]
+  restart: 'no'
+  networks: [internal]
+  depends_on:
+    postgres: { condition: service_healthy }
+
+services:
+  identity-migrate:
+    <<: *migrate
+    build:
+      {
+        context: ../..,
+        dockerfile: infra/docker/service.Dockerfile,
+        target: migrate,
+        args: { SERVICE: identity },
+      }
+    environment:
+      DATABASE_URL: postgresql://identity:${IDENTITY_DB_PASSWORD}@postgres:5432/identity
+
+  competition-migrate:
+    <<: *migrate
+    build:
+      {
+        context: ../..,
+        dockerfile: infra/docker/service.Dockerfile,
+        target: migrate,
+        args: { SERVICE: competition },
+      }
+    environment:
+      DATABASE_URL: postgresql://competition:${COMPETITION_DB_PASSWORD}@postgres:5432/competition
+
+  payment-migrate:
+    <<: *migrate
+    build:
+      {
+        context: ../..,
+        dockerfile: infra/docker/service.Dockerfile,
+        target: migrate,
+        args: { SERVICE: payment },
+      }
+    environment:
+      DATABASE_URL: postgresql://payment:${PAYMENT_DB_PASSWORD}@postgres:5432/payment
+
+  notification-migrate:
+    <<: *migrate
+    build:
+      {
+        context: ../..,
+        dockerfile: infra/docker/service.Dockerfile,
+        target: migrate,
+        args: { SERVICE: notification },
+      }
+    environment:
+      DATABASE_URL: postgresql://notification:${NOTIFICATION_DB_PASSWORD}@postgres:5432/notification
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      COMPETITION_DB_PASSWORD: ${COMPETITION_DB_PASSWORD}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    ports: ['127.0.0.1:5432:5432']
+    networks: [internal]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits: { memory: 512m }
+
+  redis:
+    image: redis:8.8-alpine
+    restart: unless-stopped
+    command:
+      ['redis-server', '--appendonly', 'yes', '--maxmemory', '128mb', '--maxmemory-policy', 'volatile-lru']
+    volumes: [redis-data:/data]
+    ports: ['127.0.0.1:6379:6379']
+    networks: [internal]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4.2-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes: [rabbitmq-data:/var/lib/rabbitmq]
+    ports:
+      - '127.0.0.1:5672:5672'
+      - '127.0.0.1:15672:15672' # management UI: inspect and replay dead-letter queues
+    networks: [internal]
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { memory: 384m }
+
+  # S3-compatible object storage (stands in for AWS S3 locally; see ADR 0004).
+  storage:
+    image: rustfs/rustfs:1.0.0
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY_ID}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_ACCESS_KEY}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ':9000'
+      RUSTFS_CONSOLE_ENABLE: 'true'
+      RUSTFS_CONSOLE_ADDRESS: ':9001'
+    volumes: [storage-data:/data]
+    ports:
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
+    networks: [internal]
+
+  # One-shot: creates the bucket, allows anonymous GET on public/* only, and expires
+  # abandoned uploads (SRS §5 object storage).
+  storage-init:
+    image: amazon/aws-cli:2.31.0
+    depends_on: [storage]
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${S3_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+    volumes: [./storage:/init:ro]
+    entrypoint: ['/bin/sh', '/init/init-bucket.sh']
+    networks: [internal]
+    restart: 'no'
+
+  mailpit:
+    image: axllent/mailpit:v1.31
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:1025:1025'
+      - '127.0.0.1:8025:8025' # web UI: read OTP emails
+    networks: [internal]
+
+  identity:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/service.Dockerfile, args: { SERVICE: identity } }
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://identity:${IDENTITY_DB_PASSWORD}@postgres:5432/identity
+    depends_on:
+      identity-migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  competition:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/service.Dockerfile, args: { SERVICE: competition } }
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://competition:${COMPETITION_DB_PASSWORD}@postgres:5432/competition
+      PAYMENT_INTERNAL_URL: http://payment:3003
+    depends_on:
+      competition-migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  payment:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/service.Dockerfile, args: { SERVICE: payment } }
+    environment:
+      PORT: 3003
+      DATABASE_URL: postgresql://payment:${PAYMENT_DB_PASSWORD}@postgres:5432/payment
+    depends_on:
+      payment-migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  notification:
+    <<: *service
+    build: { context: ../.., dockerfile: infra/docker/service.Dockerfile, args: { SERVICE: notification } }
+    environment:
+      PORT: 3004
+      DATABASE_URL: postgresql://notification:${NOTIFICATION_DB_PASSWORD}@postgres:5432/notification
+    depends_on:
+      notification-migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  gateway:
+    image: nginx:1.30-alpine
+    profiles: [app]
+    restart: unless-stopped
+    volumes: [../nginx/nginx.conf:/etc/nginx/nginx.conf:ro]
+    ports: ['127.0.0.1:8080:80']
+    networks: [internal]
+    depends_on: [identity, competition, payment, notification]
+
+networks:
+  internal: {}
+
+volumes:
+  postgres-data: {}
+  redis-data: {}
+  rabbitmq-data: {}
+  storage-data: {}

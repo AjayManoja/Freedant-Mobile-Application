@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # One grouped PR per week keeps upgrades reviewable one at a time (R-15).
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Majors are planned as their own story (R-15).
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule: { interval: weekly }

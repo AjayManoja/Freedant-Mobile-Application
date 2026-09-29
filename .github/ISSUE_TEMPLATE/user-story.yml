@@ -1,7 +1,7 @@
 name: User story
 description: A feature from the user's point of view
-title: "[Story] "
-labels: ["story"]
+title: '[Story] '
+labels: ['story']
 body:
   - type: textarea
     id: story

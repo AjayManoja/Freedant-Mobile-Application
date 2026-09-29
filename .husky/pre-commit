@@ -1,0 +1,9 @@
+pnpm exec lint-staged
+
+# Secret scan of staged changes (R-6). Skipped with a warning if gitleaks isn't installed;
+# CI always runs it.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --staged --redact --no-banner
+else
+  echo "warning: gitleaks not installed; secret scan runs in CI (see docs/03-development/LOCAL_SETUP.md)"
+fi

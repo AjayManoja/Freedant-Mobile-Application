@@ -1,0 +1,15 @@
+# Keep the build context small: sources and manifests only.
+**/node_modules
+**/dist
+**/coverage
+**/.turbo
+**/.expo
+**/src/generated
+**/.env
+**/.env.*
+.git
+design
+docs
+infra/terraform
+apps/mobile/*
+!apps/mobile/package.json

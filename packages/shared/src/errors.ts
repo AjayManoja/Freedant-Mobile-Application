@@ -1,0 +1,51 @@
+/** Every API error uses this body (SRS §5, API.md §1). */
+export interface ErrorBody {
+  error: {
+    code: ErrorCode;
+    message: string;
+    requestId: string;
+    details?: unknown;
+  };
+}
+
+export const ErrorCodes = {
+  // Generic
+  VALIDATION_FAILED: 400,
+  UNAUTHENTICATED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+  RATE_LIMITED: 429,
+  INTERNAL: 500,
+  SERVICE_UNAVAILABLE: 503,
+  // Identity
+  OTP_INCORRECT: 400,
+  OTP_EXPIRED: 410,
+  OTP_INVALIDATED: 410,
+  OTP_RESEND_TOO_SOON: 429,
+  REFRESH_TOKEN_INVALID: 401,
+  REFRESH_TOKEN_REUSED: 401,
+  SIGNUP_INCOMPLETE: 403,
+  SIGNUP_ALREADY_COMPLETE: 409,
+  ACCOUNT_DELETED: 403,
+  // Competition
+  COMPETITION_NOT_EDITABLE: 409,
+  COMPETITION_INVALID_STATE: 409,
+  REGISTRATION_CLOSED: 409,
+  NO_SPOTS_LEFT: 409,
+  ALREADY_REGISTERED: 409,
+  HOST_CANNOT_JOIN: 403,
+  IDEMPOTENCY_KEY_REUSED: 422,
+  SUBMISSION_LOCKED: 409,
+  SUBMISSION_INCOMPLETE: 409,
+  SUBMISSION_WINDOW_CLOSED: 409,
+  NOT_JUDGING_PHASE: 409,
+  UNSCORED_SUBMISSIONS: 409,
+  // Payment
+  PAYMENT_PROVIDER_ERROR: 502,
+  WEBHOOK_SIGNATURE_INVALID: 400,
+} as const;
+
+export type ErrorCode = keyof typeof ErrorCodes;
+
+export const httpStatusFor = (code: ErrorCode): number => ErrorCodes[code];

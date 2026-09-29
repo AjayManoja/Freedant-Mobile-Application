@@ -1,0 +1,184 @@
+// Payment service data model — docs/02-design/ERD.md §4.
+// The ledger is append-only double entry: every transaction's entries sum to zero
+// (deferred constraint trigger) and ledger rows can never be updated or deleted.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OrderPurpose {
+  ENTRY_FEE
+  PRIZE_FUNDING
+}
+
+enum OrderStatus {
+  CREATED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum RefundReason {
+  CANCELLATION
+  LATE_CAPTURE_REJECTED
+  FUNDING_REJECTED
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+enum AccountType {
+  /// Money outside the system (the payment provider's clearing).
+  EXTERNAL
+  PLATFORM
+  /// One per competition: prize pool plus entry fees not yet owed to anyone.
+  ESCROW
+  /// One per user: the wallet.
+  USER
+}
+
+enum LedgerKind {
+  ENTRY_FEE
+  PRIZE_FUNDING
+  REFUND
+  PRIZE
+  HOST_REVENUE
+  UNAWARDED_RETURN
+  ESCROW_RETURN
+}
+
+model Order {
+  id                String       @id @db.Uuid
+  purpose           OrderPurpose
+  referenceId       String       @map("reference_id") @db.Uuid
+  competitionId     String       @map("competition_id") @db.Uuid
+  payerId           String       @map("payer_id") @db.Uuid
+  amountPaise       Int          @map("amount_paise")
+  platformFeePaise  Int          @map("platform_fee_paise")
+  currency          String       @default("INR")
+  idempotencyKey    String       @unique @map("idempotency_key")
+  providerOrderId   String?      @unique @map("provider_order_id")
+  providerPaymentId String?      @map("provider_payment_id")
+  status            OrderStatus  @default(CREATED)
+  failureReason     String?      @map("failure_reason")
+  capturedAt        DateTime?    @map("captured_at") @db.Timestamptz(3)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  refund Refund?
+
+  @@index([referenceId])
+  @@index([status, capturedAt])
+  @@map("orders")
+}
+
+model WebhookEvent {
+  id              String    @id @db.Uuid
+  providerEventId String    @unique @map("provider_event_id")
+  eventType       String    @map("event_type")
+  /// Stored exactly as received, before any parsing (FR-PY-02).
+  rawBody         String    @map("raw_body")
+  signatureValid  Boolean   @map("signature_valid")
+  receivedAt      DateTime  @default(now()) @map("received_at") @db.Timestamptz(3)
+  processedAt     DateTime? @map("processed_at") @db.Timestamptz(3)
+
+  @@map("webhook_events")
+}
+
+model Refund {
+  id               String       @id @db.Uuid
+  orderId          String       @unique @map("order_id") @db.Uuid
+  amountPaise      Int          @map("amount_paise")
+  reason           RefundReason
+  status           RefundStatus @default(PENDING)
+  providerRefundId String?      @unique @map("provider_refund_id")
+  attempts         Int          @default(0)
+  lastError        String?      @map("last_error")
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([status, updatedAt])
+  @@map("refunds")
+}
+
+model LedgerAccount {
+  id        String      @id @db.Uuid
+  type      AccountType
+  /// Competition ID for ESCROW, user ID for USER, a fixed nil UUID for EXTERNAL and PLATFORM.
+  ownerId   String      @map("owner_id") @db.Uuid
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  entries LedgerEntry[]
+
+  @@unique([type, ownerId])
+  @@map("ledger_accounts")
+}
+
+model LedgerTransaction {
+  id                 String     @id @db.Uuid
+  kind               LedgerKind
+  /// Whose history this appears in (payer, winner or host).
+  subjectUserId      String?    @map("subject_user_id") @db.Uuid
+  competitionId      String?    @map("competition_id") @db.Uuid
+  /// What caused it: order, refund, registration or competition ID. Unique per kind, so a
+  /// replayed instruction can never post twice.
+  referenceId        String     @map("reference_id") @db.Uuid
+  /// Signed amount from the subject's point of view, for history display.
+  displayAmountPaise Int        @map("display_amount_paise")
+  description        String
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  entries LedgerEntry[]
+
+  @@unique([kind, referenceId])
+  @@index([subjectUserId, createdAt])
+  @@map("ledger_transactions")
+}
+
+model LedgerEntry {
+  id            String   @id @db.Uuid
+  transactionId String   @map("transaction_id") @db.Uuid
+  accountId     String   @map("account_id") @db.Uuid
+  /// Signed: positive = into the account, negative = out of it.
+  amountPaise   Int      @map("amount_paise")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  transaction LedgerTransaction @relation(fields: [transactionId], references: [id])
+  account     LedgerAccount     @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, createdAt])
+  @@index([transactionId])
+  @@map("ledger_entries")
+}
+
+model OutboxEvent {
+  id            String    @id @db.Uuid
+  aggregateType String    @map("aggregate_type")
+  aggregateId   String    @map("aggregate_id") @db.Uuid
+  eventType     String    @map("event_type")
+  payload       Json
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  publishedAt   DateTime? @map("published_at") @db.Timestamptz(3)
+
+  @@map("outbox_events")
+}
+
+model InboxEvent {
+  eventId      String   @map("event_id") @db.Uuid
+  consumerName String   @map("consumer_name")
+  processedAt  DateTime @default(now()) @map("processed_at") @db.Timestamptz(3)
+
+  @@id([eventId, consumerName])
+  @@map("inbox_events")
+}

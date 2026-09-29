@@ -1,0 +1,9 @@
+design/
+pnpm-lock.yaml
+**/dist/
+**/coverage/
+**/generated/
+**/.expo/
+**/migrations/**/*.sql
+# Markdown docs keep their authored layout (tables are hand-formatted).
+**/*.md

@@ -1,0 +1,23 @@
+{
+  "name": "@feedants/testing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Test helpers: a real PostgreSQL per test run (embedded, no Docker) and a fresh migrated database per test file",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": "./src/index.js",
+    "./postgres-global-setup": "./src/postgres-global-setup.mjs",
+    "./postgres-global-teardown": "./src/postgres-global-teardown.mjs"
+  },
+  "scripts": {
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "embedded-postgres": "18.4.0-beta.17",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
+}
