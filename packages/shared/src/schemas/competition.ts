@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { defaultRules, type MediaKind } from '../rules';
 import type { FeeBreakdown, PrizeTier } from '../money';
 import type { Phase } from '../timeline';
+import { paginationQuerySchema } from './common';
 
 const t = defaultRules.text;
 const r = defaultRules;
@@ -283,6 +284,26 @@ export interface HostedCompetition extends CompetitionSummary {
   entryRevenuePaise: number;
   resultsDueAt: string | null;
   overdue: boolean;
+  createdAt: string;
+}
+
+/**
+ * The host dashboard's filters (US-18): Live = published and still taking entries,
+ * Judging = submissions closed but no results yet, Draft = not yet funded,
+ * Closed = results published or cancelled.
+ */
+export const hostedFilterSchema = z.enum(['LIVE', 'JUDGING', 'DRAFT', 'CLOSED']);
+export type HostedFilter = z.infer<typeof hostedFilterSchema>;
+
+export const hostedQuerySchema = paginationQuerySchema.extend({ filter: hostedFilterSchema.optional() });
+export type HostedQuery = z.infer<typeof hostedQuerySchema>;
+
+export interface HostedSummary {
+  counts: Record<'ALL' | HostedFilter, number>;
+  /** Confirmed registrations across competitions that were not cancelled. */
+  totalEntries: number;
+  /** Entry fees owed to the host (A-10) across competitions that were not cancelled. */
+  revenuePaise: number;
 }
 
 export interface CheckoutDetails {
@@ -382,6 +403,7 @@ export interface SubmissionView {
     coverUrl: string | null;
     submissionEndsAt: string | null;
     phase: DisplayPhase;
+    categoryName: string | null;
   };
   status: SubmissionStatus;
   displayStatus: SubmissionDisplayStatus;
@@ -394,6 +416,12 @@ export interface SubmissionView {
   submittedAt: string | null;
   /** Only after results are published. */
   result: { rank: number | null; score: number | null; prizePaise: number } | null;
+}
+
+/** US-26: the My Submissions summary strip and filter counts. */
+export interface MySubmissionsSummary {
+  counts: Record<'ALL' | SubmissionDisplayStatus, number>;
+  totalWinningsPaise: number;
 }
 
 // ---------------------------------------------------------------- Judging

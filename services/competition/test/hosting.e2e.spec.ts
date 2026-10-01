@@ -323,6 +323,41 @@ describe('Competition: hosting (US-14 … US-18)', () => {
         overdue: false,
       });
       expect(res.body.items.find((i: { status: string }) => i.status === 'DRAFT')).toBeDefined();
+      expect(Date.parse(pub.createdAt)).not.toBeNaN();
+    });
+
+    it('filters into Live / Judging / Draft / Closed and summarises entries and revenue', async () => {
+      const host = uuidv7();
+      const d = await draft(host, { title: 'Still a draft' });
+      const live = await seedCompetition(t, { hostId: host, entryFeePaise: 9_900 });
+      await joinConfirmed(t, live.id, uuidv7());
+      const judging = await seedCompetition(t, { hostId: host, entryFeePaise: 5_000 });
+      await joinConfirmed(t, judging.id, uuidv7());
+      await joinConfirmed(t, judging.id, uuidv7());
+      await movePhase(t, judging.id, 'JUDGING');
+      const cancelled = await seedCompetition(t, { hostId: host, entryFeePaise: 9_900 });
+      await joinConfirmed(t, cancelled.id, uuidv7());
+      await t.http.post(`/v1/competitions/${cancelled.id}/cancel`).set(as(host)).expect(200);
+
+      const ids = async (filter: string) => {
+        const res = await t.http.get('/v1/me/competitions').query({ filter }).set(as(host)).expect(200);
+        return res.body.items.map((i: { id: string }) => i.id);
+      };
+      expect(await ids('LIVE')).toEqual([live.id]);
+      expect(await ids('JUDGING')).toEqual([judging.id]);
+      expect(await ids('DRAFT')).toEqual([d.id]);
+      expect(await ids('CLOSED')).toEqual([cancelled.id]);
+      await t.http.get('/v1/me/competitions').query({ filter: 'NOPE' }).set(as(host)).expect(400);
+
+      const closed = await t.http.get('/v1/me/competitions').query({ filter: 'CLOSED' }).set(as(host));
+      expect(closed.body.items[0]).toMatchObject({ phase: 'CANCELLED', entryRevenuePaise: 0 });
+
+      const summary = await t.http.get('/v1/me/competitions/summary').set(as(host)).expect(200);
+      expect(summary.body).toEqual({
+        counts: { ALL: 4, LIVE: 1, JUDGING: 1, DRAFT: 1, CLOSED: 1 },
+        totalEntries: 3,
+        revenuePaise: 9_900 + 2 * 5_000,
+      });
     });
 
     it('pages without duplicates', async () => {

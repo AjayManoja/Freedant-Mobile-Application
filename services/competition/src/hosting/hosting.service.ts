@@ -6,6 +6,9 @@ import {
   type DraftUpdateInput,
   draftIssues,
   type HostedCompetition,
+  type HostedFilter,
+  type HostedQuery,
+  type HostedSummary,
   type ImageUploadRequest,
   type Page,
   platformFee,
@@ -148,6 +151,7 @@ export class HostingService {
         amountPaise: c.prizePoolPaise!,
         platformFeePaise: 0,
         idempotencyKey: orderKey,
+        ...(c.title ? { title: c.title } : {}),
       });
       await this.prisma.competition.update({
         where: { id },
@@ -242,15 +246,18 @@ export class HostingService {
   }
 
   /** FR-HS-10 / US-18. */
-  async hosted(hostId: string, cursor: string | undefined, limit: number): Promise<Page<HostedCompetition>> {
+  async hosted(hostId: string, q: HostedQuery): Promise<Page<HostedCompetition>> {
+    const { cursor, limit } = q;
     const now = new Date();
     const after = decodeCursor(cursor);
     if (cursor && !after) throw new AppError('VALIDATION_FAILED', 'Invalid cursor');
-    const where: Prisma.CompetitionWhereInput = { hostId };
+    const and: Prisma.CompetitionWhereInput[] = [{ hostId }];
+    if (q.filter) and.push(hostedFilter(q.filter, now));
     if (after) {
       const at = new Date(String(after[0]));
-      where.OR = [{ createdAt: { lt: at } }, { createdAt: at, id: { lt: after[1] } }];
+      and.push({ OR: [{ createdAt: { lt: at } }, { createdAt: at, id: { lt: after[1] } }] });
     }
+    const where: Prisma.CompetitionWhereInput = { AND: and };
     const rows = await this.prisma.competition.findMany({
       where,
       include: { category: true },
@@ -263,14 +270,41 @@ export class HostingService {
       ...toSummary(c, profiles, now),
       registrations: c.confirmedCount,
       submissions: c.submissionCount,
-      entryRevenuePaise: (c.entryFeePaise ?? 0) * c.confirmedCount,
+      // A cancelled competition refunds every entry in full (US-17).
+      entryRevenuePaise: c.status === 'CANCELLED' ? 0 : (c.entryFeePaise ?? 0) * c.confirmedCount,
       resultsDueAt: iso(c.resultsDueAt),
       overdue: c.status === 'PUBLISHED' && !!c.resultsDueAt && now > c.resultsDueAt,
+      createdAt: c.createdAt.toISOString(),
     }));
     const last = page.at(-1);
     return {
       items,
       nextCursor: rows.length > limit && last ? encodeCursor(last.createdAt.toISOString(), last.id) : null,
+    };
+  }
+
+  /** US-18: the dashboard overview and the counts behind its filter chips. */
+  async hostedSummary(hostId: string): Promise<HostedSummary> {
+    const now = new Date();
+    const count = (filter?: HostedFilter) =>
+      this.prisma.competition.count({
+        where: { AND: [{ hostId }, filter ? hostedFilter(filter, now) : {}] },
+      });
+    const [all, live, judging, draft, closed, funded] = await Promise.all([
+      count(),
+      count('LIVE'),
+      count('JUDGING'),
+      count('DRAFT'),
+      count('CLOSED'),
+      this.prisma.competition.findMany({
+        where: { hostId, status: { in: ['PUBLISHED', 'RESULTS_PUBLISHED'] } },
+        select: { entryFeePaise: true, confirmedCount: true },
+      }),
+    ]);
+    return {
+      counts: { ALL: all, LIVE: live, JUDGING: judging, DRAFT: draft, CLOSED: closed },
+      totalEntries: funded.reduce((n, c) => n + c.confirmedCount, 0),
+      revenuePaise: funded.reduce((n, c) => n + (c.entryFeePaise ?? 0) * c.confirmedCount, 0),
     };
   }
 
@@ -320,5 +354,19 @@ export class HostingService {
     if (input.durationDays !== undefined) data.durationDays = input.durationDays;
     if (input.maxSpots !== undefined) data.maxSpots = input.maxSpots;
     return data as Prisma.CompetitionUncheckedCreateInput;
+  }
+}
+
+/** The dashboard buckets as a query; Live and Judging split on the submission deadline (SRS §2.5). */
+function hostedFilter(filter: HostedFilter, now: Date): Prisma.CompetitionWhereInput {
+  switch (filter) {
+    case 'DRAFT':
+      return { status: { in: ['DRAFT', 'AWAITING_FUNDING'] } };
+    case 'LIVE':
+      return { status: 'PUBLISHED', submissionEndsAt: { gt: now } };
+    case 'JUDGING':
+      return { status: 'PUBLISHED', submissionEndsAt: { lte: now } };
+    case 'CLOSED':
+      return { status: { in: ['RESULTS_PUBLISHED', 'CANCELLED'] } };
   }
 }

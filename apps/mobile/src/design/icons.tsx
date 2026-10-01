@@ -43,7 +43,10 @@ export const CheckCircle = icon(
   </>,
   { size: 16 },
 );
-export const Trophy = icon(<Path d="M6 4h12v4a6 6 0 01-12 0V4zM6 6H3v2a3 3 0 003 3M18 6h3v2a3 3 0 01-3 3M9 20h6M12 14v6" />, { size: 16 });
+export const Trophy = icon(
+  <Path d="M6 4h12v4a6 6 0 01-12 0V4zM6 6H3v2a3 3 0 003 3M18 6h3v2a3 3 0 01-3 3M9 20h6M12 14v6" />,
+  { size: 16 },
+);
 export const Users = icon(
   <>
     <Circle cx="9" cy="8" r="3" />
@@ -52,7 +55,9 @@ export const Users = icon(
   { size: 16 },
 );
 export const Play = icon(<Path d="M8 5v14l11-7z" />, { size: 18, filled: true });
-export const Hourglass = icon(<Path d="M6 3h12M6 21h12M7 3c0 4 10 5 10 9s-10 5-10 9M17 3c0 4-10 5-10 9" />, { size: 18 });
+export const Hourglass = icon(<Path d="M6 3h12M6 21h12M7 3c0 4 10 5 10 9s-10 5-10 9M17 3c0 4-10 5-10 9" />, {
+  size: 18,
+});
 export const Clock = icon(
   <>
     <Circle cx="12" cy="12" r="9" />
@@ -68,7 +73,9 @@ export const Calendar = icon(
   { size: 20 },
 );
 export const Send = icon(<Path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />, { size: 20 });
-export const Upload = icon(<Path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 15V3M7 8l5-5 5 5" />, { size: 20 });
+export const Upload = icon(<Path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 15V3M7 8l5-5 5 5" />, {
+  size: 20,
+});
 export const Chevron = icon(<Path d="M6 9l6 6 6-6" />, { size: 16 });
 export const Info = icon(
   <>
@@ -84,7 +91,10 @@ export const Shield = icon(
   </>,
   { size: 16 },
 );
-export const Megaphone = icon(<Path d="M3 11v2a1 1 0 001 1h2l4 4V6L6 10H4a1 1 0 00-1 1zM14 8a4 4 0 010 8M17 5a8 8 0 010 14" />, { size: 32 });
+export const Megaphone = icon(
+  <Path d="M3 11v2a1 1 0 001 1h2l4 4V6L6 10H4a1 1 0 00-1 1zM14 8a4 4 0 010 8M17 5a8 8 0 010 14" />,
+  { size: 32 },
+);
 export const Chat = icon(<Path d="M4 5h16v11H8l-4 4V5z" />, { size: 20 });
 export const Home = icon(<Path d="M3 11l9-8 9 8M5 10v10h14V10" />, { size: 22 });
 export const Camera = icon(
@@ -109,9 +119,17 @@ export const Search = icon(
   { size: 22 },
 );
 export const Plus = icon(<Path d="M12 5v14M5 12h14" />, { size: 24 });
-export const Fire = icon(<Path d="M12 3c1 3-2 4-2 7a2 2 0 004 0c0-1 0-1.5.5-2 1 2 2.5 3 2.5 5.5a5 5 0 01-10 0C7 12 10 9 12 3z" />, { size: 16 });
-export const Star = icon(<Path d="M12 3l2.6 5.6 6 .6-4.5 4 1.3 6L12 16.9 6.6 19.3l1.3-6-4.5-4 6-.6z" />, { size: 16, filled: true });
-export const Bell = icon(<Path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0" />, { size: 20 });
+export const Fire = icon(
+  <Path d="M12 3c1 3-2 4-2 7a2 2 0 004 0c0-1 0-1.5.5-2 1 2 2.5 3 2.5 5.5a5 5 0 01-10 0C7 12 10 9 12 3z" />,
+  { size: 16 },
+);
+export const Star = icon(<Path d="M12 3l2.6 5.6 6 .6-4.5 4 1.3 6L12 16.9 6.6 19.3l1.3-6-4.5-4 6-.6z" />, {
+  size: 16,
+  filled: true,
+});
+export const Bell = icon(<Path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0" />, {
+  size: 20,
+});
 export const Globe = icon(
   <>
     <Circle cx="12" cy="12" r="9" />
@@ -134,10 +152,40 @@ export const Trash = icon(
 );
 
 /** Generic icon from raw path data, for page-local icons that appear once. */
-export function PathIcon({ d, size = 20, color = '#1b2b3a', filled, strokeWidth = 1.8 }: IconProps & { d: string; filled?: boolean; strokeWidth?: number }) {
+export function PathIcon({
+  d,
+  size = 20,
+  color = '#1b2b3a',
+  filled,
+  strokeWidth = 1.8,
+}: IconProps & { d: string; filled?: boolean; strokeWidth?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? color : 'none'} stroke={filled ? 'none' : color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? color : 'none'}
+      stroke={filled ? 'none' : color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <Path d={d} />
     </Svg>
   );
 }
+
+/** WalletPage's local fintech icons. */
+export const Eye = icon(
+  <>
+    <Path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+    <Circle cx="12" cy="12" r="3" />
+  </>,
+  { size: 20 },
+);
+export const EyeOff = icon(
+  <Path d="M3 3l18 18M10.6 10.6a3 3 0 004.2 4.2M9.9 5.2A9.9 9.9 0 0112 5c6.5 0 10 7 10 7a17 17 0 01-3.3 4M6.6 6.6A17 17 0 002 12s3.5 7 10 7a9.7 9.7 0 004-.9" />,
+  { size: 20 },
+);
+export const ArrowUpRight = icon(<Path d="M7 17L17 7M8 7h9v9" />, { size: 22 });
+export const ArrowDownLeft = icon(<Path d="M17 7L7 17M16 17H7V8" />, { size: 22 });

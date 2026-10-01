@@ -154,6 +154,7 @@ export class JoinService {
         amountPaise: r.amountPaise,
         platformFeePaise: r.amountPaise - (c.entryFeePaise ?? 0),
         idempotencyKey: r.idempotencyKey,
+        ...(c.title ? { title: c.title } : {}),
       });
       const updated = await this.prisma.registration.update({
         where: { id: r.id },

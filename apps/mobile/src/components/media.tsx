@@ -1,11 +1,12 @@
-import { Ionicons } from '@expo/vector-icons';
 import type { MediaKind } from '@feedants/shared';
 import { Image } from 'expo-image';
 import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet } from 'react-native';
-import { colors, radius, space } from '@/theme/tokens';
-import { AppText } from './ui';
+import { View } from 'react-native';
+import { Press } from '@/design/components';
+import { Chat, Play } from '@/design/icons';
+import { T } from '@/design/text';
+import tw, { color } from '@/design/tw';
 
 /**
  * Images render inline; video and audio open in the system browser, which plays them
@@ -18,40 +19,22 @@ export function MediaPreview({ url, kind }: { url: string | null; kind: MediaKin
     return (
       <Image
         source={{ uri: url }}
-        style={styles.image}
+        style={[tw`w-full rounded-2xl bg-mint`, { aspectRatio: 4 / 3 }]}
         contentFit="cover"
         accessibilityLabel={t('submission.media')}
       />
     );
   }
   return (
-    <Pressable
+    <Press
       onPress={() => void WebBrowser.openBrowserAsync(url)}
-      accessibilityRole="button"
       accessibilityLabel={t('common.openMedia')}
-      style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
+      style={tw`h-36 rounded-2xl bg-mint items-center justify-center gap-2`}
     >
-      <Ionicons
-        name={kind === 'VIDEO' ? 'play-circle-outline' : 'musical-notes-outline'}
-        size={36}
-        color={colors.teal}
-      />
-      <AppText variant="bodyStrong" color={colors.teal}>
-        {t('common.openMedia')}
-      </AppText>
-    </Pressable>
+      <View style={tw`w-12 h-12 rounded-full bg-white items-center justify-center shadow-sm`}>
+        {kind === 'VIDEO' ? <Play color={color('teal')} /> : <Chat color={color('teal')} />}
+      </View>
+      <T style={tw`text-sm font-bold text-teal`}>{t('common.openMedia')}</T>
+    </Press>
   );
 }
-
-const styles = StyleSheet.create({
-  image: { width: '100%', aspectRatio: 4 / 3, borderRadius: radius.lg, backgroundColor: colors.mint },
-  tile: {
-    height: 140,
-    borderRadius: radius.lg,
-    backgroundColor: colors.mint,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space.sm,
-  },
-  pressed: { opacity: 0.85 },
-});

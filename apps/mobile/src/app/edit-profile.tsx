@@ -1,27 +1,24 @@
 import { defaultRules, displayNameSchema, type MeResponse, type UpdateProfileInput } from '@feedants/shared';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { avatarUploadUrl, useUpdateProfile } from '@/api/hooks';
 import { useRequireSignIn, useSession } from '@/auth/session';
-import {
-  AppText,
-  Avatar,
-  Button,
-  Field,
-  Header,
-  Loading,
-  Notice,
-  ProgressBar,
-  Row,
-  Screen,
-} from '@/components/ui';
+import { Loading } from '@/design/loading';
+import { BackHeader, Input, PersonAvatar, Press, SheetButton } from '@/design/components';
+import { Camera, Lock } from '@/design/icons';
+import { T } from '@/design/text';
+import tw, { color } from '@/design/tw';
 import { errorMessage } from '@/lib/format';
 import { pickImage, uploadToStorage } from '@/media/media';
-import { space } from '@/theme/tokens';
 
-/** US-05: name, avatar and bio. Changes reach hosted competitions via `user.updated`. */
+/**
+ * US-05: name, avatar and bio — the prototype's EditProfile (ProfilePage.tsx) as a page.
+ * Handle, city, phone and generated avatar styles are out of scope; email is the sign-in
+ * identity and shown read-only. Changes reach hosted competitions via `user.updated`.
+ */
 export default function EditProfile() {
   const signedIn = useRequireSignIn('/edit-profile');
   const user = useSession((s) => s.user);
@@ -73,70 +70,135 @@ function Form({ initial }: { initial: MeResponse }) {
   };
 
   return (
-    <Screen
-      edges={['top', 'bottom']}
-      footer={
-        <Button
-          title={t('common.save')}
-          onPress={save}
-          loading={update.isPending}
-          disabled={!nameOk || uploading !== null}
-        />
-      }
-    >
-      <Header title={t('profile.edit')} onBack={() => router.back()} />
-      <View style={styles.avatar}>
-        <Avatar uri={preview} name={name || initial.email} size={96} />
-        {uploading !== null ? (
-          <View style={styles.progress}>
-            <ProgressBar value={uploading} />
+    <SafeAreaView style={tw`flex-1 bg-canvas`} edges={['top', 'bottom']}>
+      <View style={tw`flex-1 w-full max-w-[430px] self-center`}>
+        <BackHeader subtitle={t('profileUi.eyebrow')} title={t('profile.edit')} />
+        <ScrollView
+          contentContainerStyle={tw`px-5 pt-2 pb-8 gap-4`}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Avatar + upload */}
+          <View style={tw`items-center gap-3`}>
+            <View>
+              <PersonAvatar
+                uri={preview}
+                name={name || initial.email}
+                index={0}
+                size={96}
+                style={[
+                  tw`rounded-3xl`,
+                  {
+                    boxShadow: '0 0 0 2px #fff, 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1)',
+                  },
+                ]}
+              />
+              <Press
+                onPress={() => void changeAvatar()}
+                disabled={uploading !== null}
+                accessibilityLabel={t('profile.avatar')}
+                scale={0.95}
+                style={[
+                  tw`absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full bg-teal items-center justify-center`,
+                  {
+                    boxShadow:
+                      '0 0 0 2px #fff, 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)',
+                  },
+                ]}
+              >
+                <Camera color="#fff" />
+              </Press>
+            </View>
+            {uploading !== null ? (
+              <View
+                style={tw`w-40 h-1.5 rounded-full bg-mint overflow-hidden`}
+                accessibilityLiveRegion="polite"
+              >
+                <View
+                  style={[tw`h-full rounded-full bg-teal`, { width: `${Math.round(uploading * 100)}%` }]}
+                />
+              </View>
+            ) : preview ? (
+              <Pressable
+                onPress={() => {
+                  setAvatarKey(null);
+                  setPreview(null);
+                }}
+                accessibilityRole="button"
+                hitSlop={8}
+              >
+                <T style={tw`text-xs font-semibold text-slate`}>{t('profile.removeAvatar')}</T>
+              </Pressable>
+            ) : (
+              <T style={tw`text-xs font-semibold text-slate`}>{t('profileUi.addPhoto')}</T>
+            )}
           </View>
-        ) : null}
-        <Row>
-          <Button
-            title={t('profile.avatar')}
-            kind="secondary"
-            icon="camera-outline"
-            onPress={() => void changeAvatar()}
-            disabled={uploading !== null}
-          />
-          {preview ? (
-            <Button
-              title={t('profile.removeAvatar')}
-              kind="ghost"
-              onPress={() => {
-                setAvatarKey(null);
-                setPreview(null);
-              }}
-              disabled={uploading !== null}
-            />
+
+          {error ? (
+            <View style={tw`rounded-xl bg-rose-50 px-3.5 py-2.5`} accessibilityLiveRegion="polite">
+              <T style={tw`text-xs font-semibold text-rose-500`}>{error}</T>
+            </View>
           ) : null}
-        </Row>
+
+          <Field
+            label={t('profileUi.fullName')}
+            error={name && !nameOk ? t('profileUi.nameRule', defaultRules.text) : null}
+          >
+            <Input
+              value={name}
+              onChangeText={setName}
+              maxLength={defaultRules.text.displayNameMax}
+              autoComplete="name"
+              accessibilityLabel={t('profileUi.fullName')}
+            />
+          </Field>
+
+          <Field label={t('profile.bio')}>
+            <Input
+              value={bio}
+              onChangeText={setBio}
+              multiline
+              numberOfLines={3}
+              maxLength={defaultRules.text.bioMax}
+              placeholder={t('profileUi.bioPlaceholder')}
+              accessibilityLabel={t('profile.bio')}
+              style={tw`h-[92px]`}
+            />
+            <T style={tw`mt-1 text-right text-[11px] text-slate`}>
+              {bio.length}/{defaultRules.text.bioMax}
+            </T>
+          </Field>
+
+          <Field label={t('profileUi.email')}>
+            <Input
+              value={initial.email}
+              editable={false}
+              accessibilityLabel={t('profileUi.email')}
+              icon={<Lock size={16} color={color('slate')} />}
+              style={tw`text-slate`}
+            />
+            <T style={tw`mt-1 text-[11px] text-slate`}>{t('profileUi.emailNote')}</T>
+          </Field>
+
+          <SheetButton
+            title={t('profileUi.save')}
+            onPress={save}
+            loading={update.isPending}
+            disabled={!nameOk || uploading !== null}
+          />
+        </ScrollView>
       </View>
-      {error ? <Notice tone="danger" icon="alert-circle-outline" text={error} /> : null}
-      <Field
-        label={t('profile.nameLabel')}
-        value={name}
-        onChangeText={setName}
-        maxLength={defaultRules.text.displayNameMax}
-        autoComplete="name"
-        error={name && !nameOk ? t('errors.VALIDATION_FAILED') : null}
-        hint={`${defaultRules.text.displayNameMin}–${defaultRules.text.displayNameMax}`}
-      />
-      <Field
-        label={t('profile.bio')}
-        value={bio}
-        onChangeText={setBio}
-        multiline
-        maxLength={defaultRules.text.bioMax}
-        hint={`${bio.trim().length}/${defaultRules.text.bioMax}`}
-      />
-      <AppText variant="caption">{initial.email}</AppText>
-    </Screen>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  avatar: { alignItems: 'center', gap: space.md },
-  progress: { alignSelf: 'stretch' },
-});
+/** EditProfile Field: `text-xs font-semibold text-slate` label, `mt-1`, rose error line. */
+function Field({ label, error, children }: { label: string; error?: string | null; children: ReactNode }) {
+  return (
+    <View>
+      <T style={tw`text-xs font-semibold text-slate`}>{label}</T>
+      <View style={tw`mt-1`}>{children}</View>
+      {error ? <T style={tw`mt-1 text-[11px] font-medium text-rose-500`}>{error}</T> : null}
+    </View>
+  );
+}

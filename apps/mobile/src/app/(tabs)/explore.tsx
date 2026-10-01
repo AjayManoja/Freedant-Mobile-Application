@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, Path, Pattern, Rect } from 'react-native-svg';
 import { flatten, useCategories, useCompetitions, useHome, useSearch, useUnreadCount } from '@/api/hooks';
 import { useSession } from '@/auth/session';
-import { Loading } from '@/components/ui';
+import { Loading } from '@/design/loading';
 import { categoryStyle } from '@/design/categories';
 import { Card, CompetitionRow, CoverImage, inr, Press, SectionHeader } from '@/design/components';
 import { Gradient } from '@/design/gradient';

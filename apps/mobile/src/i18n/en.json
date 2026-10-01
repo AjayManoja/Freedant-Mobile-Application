@@ -24,7 +24,9 @@
     "openMedia": "Open media",
     "today": "Today",
     "yesterday": "Yesterday",
-    "edit": "Edit"
+    "edit": "Edit",
+    "todayAt": "Today, {{time}}",
+    "yesterdayAt": "Yesterday, {{time}}"
   },
   "phase": {
     "DRAFT": "Draft",
@@ -46,33 +48,85 @@
     "ms": "{{m}}m : {{s}}s"
   },
   "onboarding": {
-    "title1": "Compete. Get judged. Win.",
-    "body1": "Discover creative competitions in dance, music, photography, writing and more.",
-    "title2": "Host your own",
-    "body2": "Launch a competition in minutes, fund the prize and pick the winners.",
-    "title3": "Fair and secure",
-    "body3": "Payments are secure, prizes are held safely until results, and winners are paid to their wallet.",
+    "skip": "Skip",
+    "next": "Next",
     "start": "Get started",
-    "browse": "Browse first"
+    "goTo": "Go to slide {{n}}",
+    "slides": {
+      "discover": {
+        "title": "Discover competitions",
+        "body": "Live contests across dance, music, art, coding and more — find one that fits your talent.",
+        "chips": {
+          "dance": "💃 Dance",
+          "music": "🎤 Music",
+          "photo": "📷 Photography",
+          "coding": "💻 Coding"
+        }
+      },
+      "compete": {
+        "title": "Compete & submit",
+        "body": "Join in a single tap, upload your entry and let the host score your work.",
+        "chips": {
+          "upload": "🎬 Upload video",
+          "formats": "📷 Photo or audio",
+          "judged": "✅ Judged fairly"
+        }
+      },
+      "win": {
+        "title": "Win & get rewarded",
+        "body": "Climb the leaderboard, win prize money to your wallet and get recognised on your public winner profile.",
+        "chips": {
+          "prizes": "🏆 Win prizes",
+          "ranked": "⭐ Get ranked",
+          "wallet": "👛 Paid to your wallet"
+        }
+      },
+      "host": {
+        "title": "Host your own",
+        "body": "Ready to run the show? Launch your own competition, set the prize and judge the entries yourself.",
+        "chips": {
+          "launch": "🚀 Launch in minutes",
+          "judge": "🏅 Judge entries",
+          "earn": "💸 Earn per entry"
+        }
+      }
+    }
   },
   "auth": {
     "title": "Sign in to Feedants",
     "subtitle": "We'll email you a 6-digit code. No password needed.",
     "email": "Email address",
     "sendCode": "Send code",
-    "verifyTitle": "Enter your code",
+    "verifyTitle": "Verify your email",
     "verifySubtitle": "We sent a 6-digit code to {{email}}",
     "code": "6-digit code",
-    "verify": "Verify",
+    "verify": "Verify & continue",
     "resend": "Resend code",
     "resendIn": "Resend in {{seconds}}s",
     "attemptsLeft": "That code isn't right. {{count}} attempts left.",
-    "nameTitle": "What should we call you?",
-    "nameSubtitle": "This is how other creators and hosts will see you.",
-    "displayName": "Display name",
-    "finish": "Finish",
+    "nameTitle": "Create your account",
+    "nameSubtitle": "One last thing — what should creators and hosts call you?",
+    "displayName": "Full name",
+    "finish": "Create account",
     "legal": "By continuing you agree to the Terms and Privacy Policy.",
-    "testMode": "Test mode — no real money is ever charged."
+    "testMode": "Test mode — no real money is ever charged.",
+    "welcome": "Welcome back",
+    "welcomeBody": "Sign in to enter competitions, track your submissions and claim your wins.",
+    "codeHint": "We'll email you a 6-digit code — no password needed.",
+    "sending": "Sending code…",
+    "sentTo": "We sent a 6-digit code to ",
+    "enterCode": "Enter verification code",
+    "verifying": "Verifying…",
+    "resendInPrefix": "Resend code in ",
+    "wrongEmail": "Wrong email? ",
+    "changeIt": "Change it",
+    "newHere": "New to Feedants? ",
+    "newHereBold": "We'll create your account",
+    "namePlaceholder": "e.g. Riya Patel",
+    "agreeBefore": "By continuing you agree to our ",
+    "terms": "Terms",
+    "agreeMiddle": " and ",
+    "privacy": "Privacy Policy"
   },
   "errors": {
     "NETWORK": "No connection. Check your internet and try again.",
@@ -221,17 +275,17 @@
       "SCHEDULE": "Schedule",
       "REVIEW": "Review"
     },
-    "titleLabel": "Title",
+    "titleLabel": "Competition title",
     "titleHint": "5–80 characters",
     "category": "Category",
     "description": "Description (optional)",
     "cover": "Cover image (optional)",
-    "addCover": "Add cover",
-    "changeCover": "Change cover",
+    "addCover": "Add a cover image",
+    "changeCover": "Change cover image",
     "prizePool": "Prize pool",
-    "prizeHint": "What winners share",
+    "prizeHint": "what winners share",
     "custom": "Custom amount (₹)",
-    "entryFee": "Entry fee (₹, 0 for free)",
+    "entryFee": "Entry fee",
     "tiers": "Prize tiers",
     "startDate": "Start date",
     "startTime": "Start time (24h, HH:MM)",
@@ -241,18 +295,41 @@
     "week": "1 week",
     "weeks": "2 weeks",
     "month": "1 month",
-    "maxSpots": "Maximum spots",
+    "maxSpots": "Max spots",
     "timeline": "Timeline",
     "review": "Review",
     "publish": "Fund & publish · {{amount}}",
     "savedDraft": "Draft saved",
     "fundingNote": "You'll pay the prize pool now (test mode). It's held safely until results or cancellation.",
-    "live": "You're live!",
-    "liveBody": "{{title}} is published.",
+    "live": "You're live! 🎉",
+    "liveBody": "is now open for entries.",
     "goDashboard": "Go to dashboard",
     "hostAnother": "Host another",
     "awaitingFunding": "Waiting for your payment to be confirmed…",
-    "abandon": "Back to draft"
+    "abandon": "Back to draft",
+    "titlePlaceholder": "e.g. Monsoon Poetry Slam",
+    "descriptionLabel": "Description",
+    "optional": "optional",
+    "descriptionPlaceholder": "Tell creators what this competition is about, rules, judging criteria…",
+    "coverHint": "A great banner draws more entries",
+    "prizeRange": "Choose between {{min}} and {{max}}",
+    "entryHint": "per creator · ₹ 0 for free",
+    "entryFeeShort": "Entry fee",
+    "winnersGet": "Winners get",
+    "tierHeadline_one": "{{count}} prize · {{top}}",
+    "tierHeadline_other": "Top {{count}} paid · {{top}} for 1st",
+    "tierEmpty": "Set a prize pool to see how it's split between the winners.",
+    "startTimeShort": "Time",
+    "spotsHint": "how many can join",
+    "spotsRange": "Between {{min}} and {{max}} spots",
+    "starts": "Starts",
+    "untitled": "Untitled competition",
+    "noCategory": "No category",
+    "hostedByYou": "{{category}} · hosted by you",
+    "publishNote": "You'll pay the prize pool now (test mode); it's held safely until results or cancellation. You can edit details until the first entry arrives.",
+    "editNote": "Only the title, category, description and cover can change once a competition is funded.",
+    "spots": "Spots",
+    "runsFor": "Runs for"
   },
   "competitions": {
     "entered": "Entered",
@@ -299,14 +376,19 @@
     "closed": "Submissions are closed.",
     "result": "Rank #{{rank}} · score {{score}}",
     "prize": "You won {{amount}}",
-    "replace": "Replace media",
+    "replace": "Replace your file",
     "mediaHint": "Photo, video or audio — checked before upload",
     "viewCompetition": "View competition",
     "opensAt": "Submissions open {{date}}",
-    "notConfirmed": "Your registration isn't confirmed yet."
+    "notConfirmed": "Your registration isn't confirmed yet.",
+    "for": "For {{title}}",
+    "checklistTitle": "Checklist",
+    "chooseFile": "Choose a file to upload",
+    "captionLabel": "Caption",
+    "score": "score {{score}}"
   },
   "judge": {
-    "title": "Judge entries",
+    "title": "Entries",
     "scored": "{{scored}} of {{total}} scored",
     "score": "Score (0–10)",
     "comment": "Comment (optional)",
@@ -317,7 +399,13 @@
     "noMedia": "No media",
     "scoreInvalid": "Enter a score from 0 to 10 with at most one decimal.",
     "scoredBadge": "Scored {{score}}",
-    "notYet": "Judging opens when submissions close."
+    "notYet": "Judging opens when submissions close.",
+    "progress": "Score every entry to publish · {{scored}}/{{total}} scored",
+    "scoreAll": "Score all entries to publish",
+    "publishShort": "Publish",
+    "tapToScore": "Tap to score",
+    "emptyTitle": "No entries",
+    "commentPlaceholder": "A note for your own reference"
   },
   "leaderboard": {
     "title": "Results",
@@ -328,7 +416,12 @@
   "notifications": {
     "title": "Notifications",
     "markAll": "Mark all read",
-    "empty": "You're all caught up."
+    "empty": "You're all caught up.",
+    "earlier": "Earlier",
+    "unread_one": "You have {{count}} unread notification",
+    "unread_other": "You have {{count}} unread notifications",
+    "unreadLabel": "Unread",
+    "emptyBody": "Updates about your entries, results and payments will show up here."
   },
   "wallet": {
     "title": "Wallet",
@@ -342,11 +435,11 @@
     },
     "byCard": "via payment method",
     "empty": "No transactions yet.",
-    "later": "Withdrawals arrive in a later release."
+    "later": "Withdrawals to your bank arrive in a later release."
   },
   "profile": {
     "title": "Profile",
-    "edit": "Edit profile",
+    "edit": "Edit Profile",
     "joined": "Joined",
     "won": "Won",
     "winnings": "Winnings",
@@ -368,9 +461,9 @@
     "signOut": "Sign out",
     "delete": "Delete account",
     "deleteConfirm": "Delete your account? Your name, email, photo and bio are removed. This can't be undone.",
-    "terms": "Terms of Service",
+    "terms": "Terms & Conditions",
     "privacy": "Privacy Policy",
-    "version": "Version {{version}} · test mode"
+    "version": "{{version}} · test mode"
   },
   "winner": {
     "placements": "Placements",
@@ -379,9 +472,101 @@
     "empty": "No placements yet."
   },
   "legal": {
-    "terms": "Terms of Service",
+    "terms": "Terms & Conditions",
     "privacy": "Privacy Policy",
-    "placeholder": "Feedants is a portfolio demo running in payment test mode. No real money is collected or paid out. We store only your email address, display name, profile photo and bio, and you can delete your account at any time from Settings. This text is placeholder content, not legal advice."
+    "eyebrow": "Legal",
+    "updated": "Last updated {{date}}",
+    "onThisPage": "On this page",
+    "contact": "Feedants is a portfolio demo; this text is not legal advice.",
+    "docs": {
+      "terms": {
+        "title": "Terms & Conditions",
+        "intro": "Welcome to Feedants. By creating an account or entering a competition you agree to these Terms. Feedants is a portfolio demo: payments run in test mode and no real money is collected or paid out.",
+        "sections": [
+          {
+            "heading": "Eligibility",
+            "body": [
+              "You need an email address you can receive sign-in codes at. You are responsible for keeping access to that inbox secure and for all activity under your account."
+            ]
+          },
+          {
+            "heading": "Competitions & submissions",
+            "body": [
+              "Hosts set the title, prize pool, entry fee, schedule and number of spots for each competition, and fund the prize pool before it goes live.",
+              "By submitting an entry you confirm that the work is original and that you have the rights to it. Entries are locked once submitted. The host scores every entry from 0 to 10, and published results are final."
+            ]
+          },
+          {
+            "heading": "Fees, prizes & refunds",
+            "body": [
+              "Entry fees, if any, are shown before you join and are processed through Razorpay in test mode.",
+              "If a competition is cancelled, every paid entry is refunded in full and the prize pool returns to the host. Prizes are credited to your in-app Wallet when results are published; withdrawals to a bank arrive in a later release."
+            ]
+          },
+          {
+            "heading": "Acceptable use",
+            "body": [
+              "Do not harass other users, upload unlawful or harmful content, or try to manipulate judging.",
+              "We may remove content or suspend accounts that break these Terms."
+            ]
+          },
+          {
+            "heading": "Disclaimers & liability",
+            "body": [
+              "Feedants is provided “as is” as a demonstration. To the fullest extent permitted by law, we are not liable for indirect or consequential losses arising from its use."
+            ]
+          },
+          {
+            "heading": "Changes to these Terms",
+            "body": [
+              "We may update these Terms. Continued use after an update means you accept the revised Terms."
+            ]
+          }
+        ]
+      },
+      "privacy": {
+        "title": "Privacy Policy",
+        "intro": "This policy explains what Feedants stores and why. We keep only what we need to run competitions: your email address, display name, profile photo and bio, plus the entries and payments you make.",
+        "sections": [
+          {
+            "heading": "Information we collect",
+            "body": [
+              "Account details you provide — your email address, display name, bio and profile photo.",
+              "Content you create — competitions you host, and your entries with their media and captions.",
+              "Records of entry fees, prize pools, prizes and refunds. Card and UPI details are handled by Razorpay and never stored by us."
+            ]
+          },
+          {
+            "heading": "How we use your data",
+            "body": [
+              "To run competitions: registrations, submissions, judging, results and the wallet.",
+              "To send in-app notifications about your entries, results and payments, and to keep Feedants safe from abuse."
+            ]
+          },
+          {
+            "heading": "When we share information",
+            "body": [
+              "Hosts see the entries submitted to their competitions, with the entrant's name and photo. Winners' names and photos appear on public results.",
+              "Our payment processor (Razorpay) receives what it needs to take a payment. We never sell your personal data."
+            ]
+          },
+          {
+            "heading": "Your rights & choices",
+            "body": [
+              "You can edit your name, bio and photo at any time from Edit Profile.",
+              "You can delete your account from Settings. Your name, email, photo and bio are removed; payment records needed for accounting are kept without your profile attached."
+            ]
+          },
+          {
+            "heading": "Data security & retention",
+            "body": [
+              "Sign-in uses one-time codes sent to your email, so there is no password to leak. Data is encrypted in transit and access is restricted.",
+              "We keep your information while your account is active, or as long as needed to provide the service."
+            ]
+          }
+        ]
+      }
+    }
   },
   "design": {
     "prize": "Prize",
@@ -576,5 +761,183 @@
     "pts": "pts",
     "wins": "Wins",
     "achievements": "Achievements"
+  },
+  "mySubs": {
+    "eyebrow": "Everything you've entered",
+    "title": "My Submissions",
+    "totalWinnings": "Total winnings",
+    "entries": "Entries",
+    "wins": "Wins",
+    "inReview": "In review",
+    "filter": {
+      "ALL": "All",
+      "DRAFT": "Draft",
+      "IN_REVIEW": "In review",
+      "WON": "Won",
+      "NOT_SELECTED": "Not selected"
+    },
+    "kind": {
+      "IMAGE": "Photo",
+      "VIDEO": "Video",
+      "AUDIO": "Audio",
+      "none": "No file yet"
+    },
+    "submittedAt": "Submitted {{when}}",
+    "submitBy": "Submit by {{date}}",
+    "draftProgress": "{{percent}}% ready · finish to enter",
+    "draftClosed": "Submissions closed before you submitted",
+    "continue": "Continue",
+    "locked": "Locked in · scores come with the results",
+    "view": "View",
+    "place": "{{place}} Winner",
+    "emptyAll": "No entries yet",
+    "emptyAllBody": "Enter your first competition and your submissions will show up here.",
+    "emptyFilter": "Nothing {{filter}}",
+    "emptyFilterBody": "You have no {{filter}} entries right now. Try a different filter.",
+    "findCompetition": "Find a competition",
+    "showAll": "Show all entries"
+  },
+  "myComps": {
+    "eyebrow": "Host dashboard",
+    "title": "My Competitions",
+    "new": "New",
+    "liveNow": "Live now",
+    "totalEntries": "Total entries",
+    "revenue": "Revenue",
+    "filter": {
+      "ALL": "All",
+      "LIVE": "Live",
+      "JUDGING": "Judging",
+      "DRAFT": "Draft",
+      "CLOSED": "Closed"
+    },
+    "status": {
+      "LIVE": "Live",
+      "UPCOMING": "Upcoming",
+      "JUDGING": "Judging",
+      "DRAFT": "Draft",
+      "AWAITING_FUNDING": "Payment pending",
+      "COMPLETED": "Closed",
+      "CANCELLED": "Cancelled"
+    },
+    "created": "{{category}} · created {{date}}",
+    "createdNoCategory": "Created {{date}}",
+    "submitted_one": "{{count}} entry",
+    "submitted_other": "{{count}} entries",
+    "overdue": "Results overdue — score entries and publish",
+    "editDraft": "Edit draft",
+    "publish": "Publish",
+    "view": "View",
+    "viewEntries": "View entries",
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "scorePublish": "Score & publish",
+    "results": "Results",
+    "cancelTitle": "Cancel competition?",
+    "cancelBody": "“{{title}}” will stop taking entries. Everyone who paid gets a full refund and your prize pool returns to your wallet.",
+    "keep": "Keep it",
+    "cancelIt": "Cancel it",
+    "cancelled": "Competition cancelled",
+    "emptyAll": "No competitions yet",
+    "emptyAllBody": "Host your first competition — set a prize, invite creators and judge the entries.",
+    "hostOne": "Host a competition",
+    "emptyFilter": "Nothing {{filter}}",
+    "emptyFilterBody": "You have no {{filter}} competitions right now. Try a different filter.",
+    "showAll": "Show all competitions"
+  },
+  "walletUi": {
+    "brand": "Feedants Wallet",
+    "show": "Show balance",
+    "hide": "Hide balance",
+    "entries": "Entries",
+    "hosting": "Hosting",
+    "explore": "Explore",
+    "alerts": "Alerts",
+    "prizesWon": "Prizes won",
+    "transactions": "Transactions",
+    "group": {
+      "today": "Today",
+      "week": "This week",
+      "earlier": "Earlier"
+    },
+    "kind": {
+      "ENTRY_FEE": "Entry fee",
+      "PRIZE_FUNDING": "Prize pool",
+      "REFUND": "Refund",
+      "PRIZE": "Prize",
+      "HOST_REVENUE": "Entry revenue",
+      "UNAWARDED_RETURN": "Unawarded prizes",
+      "ESCROW_RETURN": "Prize pool returned"
+    },
+    "emptyBody": "Join a competition and your entry fees, prizes and refunds will show up here.",
+    "emptyFilter": "No transactions in this category."
+  },
+  "ago": {
+    "now": "Just now",
+    "minutes": "{{count}}m ago",
+    "hours": "{{count}}h ago",
+    "days_one": "{{count}} day ago",
+    "days_other": "{{count}} days ago"
+  },
+  "profileUi": {
+    "eyebrow": "Your account",
+    "guestTitle": "You're browsing as a guest",
+    "memberSince": "{{email}} · since {{date}}",
+    "winnings": "Winnings",
+    "account": "Account",
+    "compsSub": "Host dashboard · {{count}} live",
+    "wallet": "Wallet & Payments",
+    "walletSub": "Balance {{amount}} · earnings & refunds",
+    "walletFallback": "Balance, earnings & refunds",
+    "unread_one": "{{count}} unread",
+    "unread_other": "{{count}} unread",
+    "caughtUp": "You're all caught up",
+    "accountSettings": "Account Settings",
+    "settingsSub": "Sign out and account deletion",
+    "legal": "Terms & Privacy",
+    "legalSub": "How Feedants works with you",
+    "logOut": "Log Out",
+    "logOutTitle": "Log out?",
+    "logOutBody": "You'll need to sign in again to continue.",
+    "logOutConfirm": "Log out",
+    "version": "Feedants · v{{version}}",
+    "entries_one": "{{count}} entry",
+    "entries_other": "{{count}} entries",
+    "wins_one": "{{count}} win",
+    "wins_other": "{{count}} wins",
+    "addPhoto": "Tap the camera to add a photo",
+    "fullName": "Full name",
+    "nameRule": "Use {{displayNameMin}}–{{displayNameMax}} characters",
+    "bioPlaceholder": "Tell others about yourself",
+    "email": "Email",
+    "emailNote": "You sign in with this address, so it can't be changed here.",
+    "save": "Save changes"
+  },
+  "settingsUi": {
+    "eyebrow": "Manage your app",
+    "viewProfile": "{{email}} · View profile",
+    "email": "Email address",
+    "emailToast": "Your email is how you sign in",
+    "signIn": "Sign-in",
+    "signInValue": "One-time codes sent to your email",
+    "inbox": "Notification inbox",
+    "support": "Support & About",
+    "about": "About Feedants",
+    "aboutValue": "A portfolio demo · payments in test mode",
+    "version": "App version",
+    "deleteAccount": "Delete Account",
+    "deleteTitle": "Delete your account?",
+    "deleteBody": "Your name, email, photo and bio are removed and you're signed out everywhere. This can't be undone.",
+    "deleteWord": "DELETE",
+    "typeBefore": "Type ",
+    "typeAfter": " to confirm",
+    "typeLabel": "Type {{word}} to confirm",
+    "deleteForever": "Delete forever",
+    "footer": "Feedants · Made in India 🇮🇳"
+  },
+  "splash": {
+    "label": "Feedants is starting",
+    "tagline": "Compete · Create · Win",
+    "madeIn": "Made in India 🇮🇳"
   }
 }

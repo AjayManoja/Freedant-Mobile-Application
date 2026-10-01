@@ -5,6 +5,7 @@ import {
   formatInr,
   type NotificationTarget,
   type NotificationType,
+  orderDescription,
   type PrizeTier,
   type Timeline,
 } from '@feedants/shared';
@@ -99,6 +100,7 @@ export interface SeedOrder {
   providerOrderId: string;
   providerPaymentId: string;
   capturedAt: Date;
+  title: string;
 }
 
 export type AccountRef = { type: 'EXTERNAL' | 'PLATFORM' | 'ESCROW' | 'USER'; ownerId: string };
@@ -503,6 +505,7 @@ export function buildDataset(now: Date = new Date()): SeedDataset {
           providerOrderId: providerRef('order', orderId),
           providerPaymentId: providerRef('pay', orderId),
           capturedAt: confirmedAt,
+          title: spec.title,
         });
         postings.push({
           id: seedId(`ledger:ENTRY_FEE:${orderId}`),
@@ -511,7 +514,7 @@ export function buildDataset(now: Date = new Date()): SeedDataset {
           subjectUserId: userId(key),
           competitionId: id,
           displayAmountPaise: -fees.totalPaise,
-          description: 'Entry fee',
+          description: orderDescription('ENTRY_FEE', spec.title),
           createdAt: confirmedAt,
           entries: [
             { account: EXTERNAL, amountPaise: -fees.totalPaise },
@@ -583,6 +586,7 @@ export function buildDataset(now: Date = new Date()): SeedDataset {
       providerOrderId: funding.providerOrderId,
       providerPaymentId: providerRef('pay', fundingOrderId),
       capturedAt: publishedAt,
+      title: spec.title,
     });
     postings.push({
       id: seedId(`ledger:PRIZE_FUNDING:${fundingOrderId}`),
@@ -591,7 +595,7 @@ export function buildDataset(now: Date = new Date()): SeedDataset {
       subjectUserId: hostId,
       competitionId: id,
       displayAmountPaise: -prizePoolPaise,
-      description: 'Prize pool funding',
+      description: orderDescription('PRIZE_FUNDING', spec.title),
       createdAt: publishedAt,
       entries: [
         { account: EXTERNAL, amountPaise: -prizePoolPaise },

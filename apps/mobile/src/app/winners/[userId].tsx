@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePublicUser, useWinner } from '@/api/hooks';
-import { Loading } from '@/components/ui';
+import { Loading } from '@/design/loading';
 import { BottomNav } from '@/design/bottom-nav';
 import { Card, CoverImage, inr, PersonAvatar, Press } from '@/design/components';
 import { EmptyState, NoResultsArt } from '@/design/empty';

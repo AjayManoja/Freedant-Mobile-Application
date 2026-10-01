@@ -66,6 +66,8 @@ model Order {
   platformFeePaise  Int          @map("platform_fee_paise")
   currency          String       @default("INR")
   idempotencyKey    String       @unique @map("idempotency_key")
+  /// Competition title at order time, for wallet descriptions.
+  title             String?
   providerOrderId   String?      @unique @map("provider_order_id")
   providerPaymentId String?      @map("provider_payment_id")
   status            OrderStatus  @default(CREATED)

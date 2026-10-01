@@ -1,7 +1,6 @@
-# Handoff — continue the mobile design port
+# Handoff — mobile design port
 
-Written 2026-09-29 at the end of a working session, so a new session can pick up exactly where
-this one stopped. Branch: `feat/mobile-design-port`.
+Updated 2026-10-02 at the end of the session that finished the port. Branch: `feat/mobile-design-port`.
 
 ## 1. Where things stand
 
@@ -9,14 +8,24 @@ this one stopped. Branch: `feat/mobile-design-port`.
   user stories US-01…US-33, with e2e tests (all passing; `pnpm turbo run test --filter='!@feedants/mobile'`).
   US-34 (local stack + seed) and US-35 (CI) are done. US-36 tracing (sprint S7) and US-37…39
   (deploy, alerts, backups — Phase 5) are not started.
-- **Mobile app:** every screen exists and works against the API. A **pixel-perfect port to the
-  design** (`design/reference` + `design/prototype/src`) is in progress — see §3.
-- **Bug fixed this session:** "Payment didn't go through / We couldn't find that" after tapping
-  test payment. The gateway had no route for `POST /v1/payments/dev/simulate`, so it went to the
-  competition service (404). Fixed in `infra/nginx/nginx.conf`; verified end to end in the UI.
+- **Mobile app:** every screen is ported to the design (`design/reference` + `design/prototype/src`)
+  — see §3. The old kit `src/components/ui.tsx` is deleted; everything uses `src/design/`.
+- **Backend additions for the port (this session):**
+  - `GET /v1/me/submissions/summary` → counts per status + total winnings (`MySubmissionsSummary`).
+  - `GET /v1/me/competitions?filter=LIVE|JUDGING|DRAFT|CLOSED` and `GET /v1/me/competitions/summary`
+    (`HostedSummary`: counts, total entries, revenue). Cancelled competitions report ₹0 revenue.
+  - `createdAt` on `HostedCompetition`; `categoryName` on `SubmissionView.competition`.
+  - Payment orders store the competition `title` (optional on `createOrderSchema`, migration
+    `20261002000000_order_title`), so wallet lines read "Entry — Monsoon Poetry Slam",
+    "Prize pool — …", "Refund — …" (`orderDescription` in `@feedants/shared`).
+  - **The ledger is append-only (DB trigger)**, so rows written before this change still say
+    "Entry fee". A fresh volume + reseed shows titled lines for the demo data:
+    `docker compose -f infra/docker/compose.yaml down -v`, then `up` and the seed loop in §4.
 
 ## 2. Decisions the user made (keep to them)
 
+- **Exact design replication** of `design/reference` / `design/prototype/src`, measured with
+  `tools/design-parity`.
 - **Font:** Poppins (the design tokens), not the fallback font baked into the reference PNGs.
 - **Out-of-scope UI is omitted**, not faked: Messages, Refer, Live counts/badges, rank/level,
   ratings, followers, Follow/Message buttons, intro videos, testimonials, ad slot, language toggle.
@@ -27,53 +36,34 @@ this one stopped. Branch: `feat/mobile-design-port`.
 
 ## 3. Design port — status
 
-Foundation (`apps/mobile/src/design/`): `tw.ts` (twrnc with Tailwind v4 radii/shadows/OKLCH palette),
-`text.tsx` (`T` — Poppins weights, CSS-like line heights and inheritance), `icons.tsx` (the
-prototype's SVG icons), `gradient.tsx`, `components.tsx` (Card, SectionHeader, PageHeader,
-CompetitionRow, ExpandToggle, Orb/PersonAvatar, BottomSheet incl. `bare`, Press, Spinner),
-`empty.tsx` (EmptyState + illustrations), `bottom-nav.tsx` (tab bar + Create sheet, also rendered
-by pushed screens), `competition-list.tsx`, `categories.tsx`.
+Foundation (`apps/mobile/src/design/`): `tw.ts`, `text.tsx` (`T`), `icons.tsx`, `gradient.tsx`,
+`components.tsx` (Card, SectionHeader, PageHeader, **BackHeader**, CompetitionRow, ExpandToggle,
+Orb/PersonAvatar, BottomSheet, Press, Spinner, SheetButton, **FilterChips, StatusPill, useToast,
+ConfirmDialog, FormField, Input**), `empty.tsx`, `bottom-nav.tsx`, `competition-list.tsx`,
+`categories.tsx`, **`loading.tsx`**, **`splash.tsx`** (brand splash, mounted in `app/_layout.tsx`).
 
-| Screen | Prototype source | Status |
+| Screen | Prototype source | Status / notes |
 |---|---|---|
-| Home | `HomePage.tsx` | ✅ ported, measured to the pixel |
-| Explore | `ExplorePage.tsx` | ✅ ported |
-| Trending / Ending lists, Competitions tab | `ListPage.tsx` | ✅ ported (`app/explore/[type].tsx`, `app/(tabs)/competitions.tsx`) |
-| Search | `SearchPage.tsx` | ✅ ported (`app/search.tsx`) |
-| Competition detail + checkout sheet | `CompetitionsPage.tsx` | ✅ ported (`app/competition/[id]/index.tsx`); pay flow verified |
-| Leaderboard | `LeaderboardPage.tsx` | ✅ ported, final-results mode only (no live mode) |
-| Winner profile | `WinnerProfilePage.tsx` | ✅ ported (`app/winners/[userId].tsx`) |
-| My Submissions | `MySubmissionsPage.tsx` | ⏳ **next** — `app/submissions.tsx` currently re-exports the old `my-competitions.tsx` |
-| Submission editor | (part of MySubmissions / UploadSheet) | ⏳ restyle `app/submission/[registrationId].tsx` |
-| My Competitions (host dashboard) | `MyCompetitionsPage.tsx` | ⏳ **next** — old screen at `app/my-competitions.tsx` |
-| Judge entries | `MyCompetitionsPage.tsx` EntriesSheet | ⏳ restyle `app/competition/[id]/judge.tsx` |
-| Host wizard | `HostPage.tsx` | ⏳ |
-| Wallet | `WalletPage.tsx` | ⏳ |
-| Notifications | `NotificationsPage.tsx` | ⏳ |
-| Profile, Edit profile | `ProfilePage.tsx` | ⏳ |
-| Settings, Terms, Privacy | `SettingsPage.tsx`, `LegalPage.tsx` | ⏳ |
-| Sign-in (email → code → name) | `LoginPage.tsx`, `OtpVerificationPage.tsx`, `SignUpPage.tsx` | ⏳ |
-| Onboarding, Splash | `components/Onboarding.tsx`, `SplashScreen.tsx` | ⏳ |
+| Home, Explore, lists, Search, Detail + checkout, Leaderboard, Winner profile | (see git history) | ✅ ported earlier |
+| My Submissions (`app/submissions.tsx`) | `MySubmissionsPage.tsx` | ✅ measured to ±0.5 px. Filters All/Draft/In review/Won/Not selected. Drafts → "Continue", submitted → "View" (entries lock on submit, US-25) |
+| Submission editor (`app/submission/[registrationId].tsx`) | UploadSheet in `CompetitionsPage.tsx` | ✅ dashed drop zone + Photo/Video/Audio, checklist, ringed caption, rules switch, sticky submit |
+| My Competitions (`app/my-competitions.tsx`) | `MyCompetitionsPage.tsx` | ✅ measured. "views" → entry count. Draft: Edit draft + Publish (opens wizard at Review via `?step=REVIEW`); Live: View + Edit (0 registrations) + Cancel (confirm dialog, US-17); Judging: View + Score & publish; Closed: View + Results |
+| Judge entries (`app/competition/[id]/judge.tsx`) | EntriesSheet in `MyCompetitionsPage.tsx` | ✅ numbered rows, mint progress, score sheet with quick scores, publish confirm |
+| Host wizard (`app/host.tsx`) | `HostPage.tsx` | ✅ step 1 measured to the pixel; Prize card shows the real tier split instead of "estimated reach"; success screen |
+| Wallet (`app/wallet.tsx`) | `WalletPage.tsx` | ✅ measured. Withdraw/Add/Send/Rewards → Entries/Hosting/Explore/Alerts; card number → email; Prime → INR; Pending payout → prizes won |
+| Notifications | `NotificationsPage.tsx` | ✅ measured; Today/Earlier, relative times |
+| Profile tab, Edit profile | `ProfilePage.tsx` | ✅ achievements, handle/city, rank, Refer, activity, help omitted; stats show winnings |
+| Settings, Terms, Privacy | `SettingsPage.tsx`, `LegalPage.tsx` | ✅ only real settings; typed-DELETE sheet; legal text rewritten to match what Feedants actually does |
+| Sign-in (email → code → name) | `LoginPage.tsx`, `OtpVerificationPage.tsx`, `SignUpPage.tsx` | ✅ verified end to end; 6-box code auto-submits; password/phone/Google omitted |
+| Onboarding, Splash | `components/Onboarding.tsx`, `SplashScreen.tsx` | ✅ swipeable 4 slides (copy corrected where it over-claimed); splash 1.9 s + 0.5 s fade |
 
-Screens not yet ported still use the old kit in `src/components/ui.tsx`; delete it once the last
-screen moves over.
+### Loose ends
 
-### Planned mapping for the next two screens (agreed approach, not yet built)
-
-- **My Submissions:** summary (total winnings, entries, wins, in review), status filter chips with
-  counts (All / Draft / In review / Won / Not selected — US-26), rows with the Won banner. The
-  design's "Manage" sheet (replace/withdraw) conflicts with entries locking on submit (US-25):
-  drafts get "Continue" → editor, submitted entries get "View".
-- **My Competitions:** overview (live, total entries, revenue), filters All/Live/Judging/Draft/Closed,
-  action bars: Draft → Edit draft + Publish (funding), Live → View + Edit (only with 0 registrations)
-  + Cancel (US-17, full refunds, confirm dialog), Judging → View entries + "Score & publish" (judge
-  screen), Closed → View + Results.
-- **Backend additions still to make for these:** `createdAt` on `HostedCompetition`
-  (`services/competition/src/hosting/hosting.service.ts` ~line 260) and `categoryName` on
-  `SubmissionView.competition` (`submissions.service.ts` `view()`), plus the shared types.
-  Already done this session: `CategoryListing.liveCount`, `CountedPage.total` on
-  `GET /v1/competitions`, `competitionCoverUrl` on recent winners, `competitionCoverUrl` +
-  `categoryName` on winner placements.
+- `@expo/vector-icons` is no longer imported anywhere; remove it from `apps/mobile/package.json`
+  if nothing else needs it.
+- Old i18n sections (`competitions.*`, parts of `submission.*`, `profile.*`) have unused keys.
+- On Windows Chrome the 🇮🇳 emoji renders as "IN" (no flag glyphs); phones show the flag.
+- Splash and onboarding were captured but not measured (the references are mid-animation).
 
 ## 4. Running everything (this machine)
 
@@ -94,9 +84,10 @@ screen moves over.
 `cd apps/mobile && npx tsc --noEmit`, `npx eslint --no-ignore "apps/mobile/src/**/*.{ts,tsx}"` from
 the repo root (mobile has no ESLint config of its own), `npx prettier --check`, then capture +
 measure against the reference. Backend changes: `pnpm --filter @feedants/competition test`.
+The brand splash covers the first ~2.4 s after the bundle renders; pass `--after=4000` (or more) to
+`capture.mjs` so it has faded before the screenshot.
 
 ## 6. Prompt to start the next session
 
-> Continue the Feedants mobile design port. Read `docs/HANDOFF.md` first and follow its decisions.
-> Next: port My Submissions and My Competitions (with the two backend additions listed), then the
-> remaining ⏳ screens in order, verifying each with `tools/design-parity`.
+> Continue Feedants. Read `docs/HANDOFF.md` first. The mobile design port is complete; next is
+> US-36 (tracing) and the Phase 5 stories (US-37…39), or the loose ends in §3.

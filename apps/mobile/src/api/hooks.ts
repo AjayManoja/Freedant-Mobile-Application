@@ -6,11 +6,14 @@ import type {
   DraftUpdateInput,
   HomeResponse,
   HostedCompetition,
+  HostedFilter,
+  HostedSummary,
   JoinResponse,
   JudgingEntry,
   Leaderboard,
   ListQuery,
   MeResponse,
+  MySubmissionsSummary,
   NotificationView,
   Page,
   PublicUser,
@@ -152,13 +155,21 @@ export function useUpdateProfile() {
 
 // ---------------------------------------------------------------- hosting
 
-export const useHosted = () =>
+export const useHosted = (filter?: HostedFilter) =>
   useInfiniteQuery({
-    queryKey: ['hosted'],
+    queryKey: ['hosted', filter],
     enabled: signedIn(),
     queryFn: ({ pageParam }) =>
-      api<Page<HostedCompetition>>('/v1/me/competitions', { query: { cursor: pageParam } }),
+      api<Page<HostedCompetition>>('/v1/me/competitions', { query: { filter, cursor: pageParam } }),
     ...pageParams,
+  });
+
+/** Under the ['hosted'] key, so every invalidation of the list refreshes it too. */
+export const useHostedSummary = () =>
+  useQuery({
+    queryKey: ['hosted', 'summary'],
+    enabled: signedIn(),
+    queryFn: () => api<HostedSummary>('/v1/me/competitions/summary'),
   });
 
 export const saveDraft = (id: string | null, input: DraftUpdateInput) =>
@@ -216,6 +227,14 @@ export const useMySubmissions = (status?: SubmissionDisplayStatus) =>
     queryFn: ({ pageParam }) =>
       api<Page<SubmissionView>>('/v1/me/submissions', { query: { status, cursor: pageParam } }),
     ...pageParams,
+  });
+
+/** Under the ['my-submissions'] key, so every invalidation of the list refreshes it too. */
+export const useMySubmissionsSummary = () =>
+  useQuery({
+    queryKey: ['my-submissions', 'summary'],
+    enabled: signedIn(),
+    queryFn: () => api<MySubmissionsSummary>('/v1/me/submissions/summary'),
   });
 
 // ---------------------------------------------------------------- judging

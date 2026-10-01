@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { ENV, uuidv7 } from '@feedants/server-kit';
+import { orderDescription } from '@feedants/shared';
 import type { PaymentEnv } from '../config';
 import type { RefundReason } from '../generated/prisma/client';
 import { EXTERNAL, escrow, LedgerService, PLATFORM } from '../ledger/ledger.service';
@@ -56,7 +57,7 @@ export class RefundsService implements OnApplicationBootstrap, OnApplicationShut
       subjectUserId: order.payerId,
       competitionId: order.competitionId,
       displayAmountPaise: order.amountPaise,
-      description: order.purpose === 'ENTRY_FEE' ? 'Entry fee refund' : 'Prize pool refund',
+      description: orderDescription(order.purpose, order.title, true),
       entries: [
         { account: escrow(order.competitionId), amountPaise: -(order.amountPaise - order.platformFeePaise) },
         { account: PLATFORM, amountPaise: -order.platformFeePaise },

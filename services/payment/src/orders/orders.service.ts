@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AppError, uuidv7 } from '@feedants/server-kit';
-import type { CreateOrderInput, CreateOrderResponse } from '@feedants/shared';
+import { type CreateOrderInput, type CreateOrderResponse, orderDescription } from '@feedants/shared';
 import type { Order } from '../generated/prisma/client';
 import { EXTERNAL, escrow, LedgerService, PLATFORM } from '../ledger/ledger.service';
 import { outbox } from '../outbox';
@@ -101,7 +101,7 @@ export class OrdersService {
       subjectUserId: order.payerId,
       competitionId: order.competitionId,
       displayAmountPaise: -order.amountPaise,
-      description: order.purpose === 'ENTRY_FEE' ? 'Entry fee' : 'Prize pool funding',
+      description: orderDescription(order.purpose, order.title),
       entries: [
         { account: EXTERNAL, amountPaise: -order.amountPaise },
         { account: escrow(order.competitionId), amountPaise: net },

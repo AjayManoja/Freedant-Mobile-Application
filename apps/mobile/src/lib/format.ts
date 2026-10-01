@@ -17,7 +17,31 @@ const dateTimeFmt = new Intl.DateTimeFormat('en-IN', {
 const shortFmt = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
 /** The design's compact date: "5 Oct 26". */
 export const formatShortDate = (iso: string | null | undefined) =>
-  iso ? shortFmt.format(new Date(iso)) : '—';
+  iso ? shortFmt.format(new Date(iso)).replace('Sept', 'Sep') : '—';
+const timeFmt = new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+/** The design's relative stamp: "Today, 9:14 AM", "Yesterday, 8:02 PM", else "24 Sep 26". */
+export function formatWhen(iso: string, t: TFunction, now = new Date()): string {
+  const d = new Date(iso);
+  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(now) - day(d)) / 86_400_000);
+  const time = timeFmt.format(d).toUpperCase();
+  if (diff === 0) return t('common.todayAt', { time });
+  if (diff === 1) return t('common.yesterdayAt', { time });
+  return formatShortDate(iso);
+}
+/** NotificationsPage stamps: "12m ago", "3h ago", "Yesterday", "2 days ago", then a date. */
+export function formatAgo(iso: string, t: TFunction, now = new Date()): string {
+  const ms = now.getTime() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60_000);
+  if (min < 1) return t('ago.now');
+  if (min < 60) return t('ago.minutes', { count: min });
+  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((day(now) - day(new Date(iso))) / 86_400_000);
+  if (days === 0) return t('ago.hours', { count: Math.floor(min / 60) });
+  if (days === 1) return t('common.yesterday');
+  if (days < 7) return t('ago.days', { count: days });
+  return formatShortDate(iso);
+}
 export const formatDate = (iso: string | null | undefined) => (iso ? dateFmt.format(new Date(iso)) : '—');
 export const formatDateTime = (iso: string | null | undefined) =>
   iso ? dateTimeFmt.format(new Date(iso)) : '—';

@@ -8,7 +8,7 @@ import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { flatten, useCategories, useSearch } from '@/api/hooks';
 import { useNetwork } from '@/api/network';
-import { Loading } from '@/components/ui';
+import { Loading } from '@/design/loading';
 import { BottomNav } from '@/design/bottom-nav';
 import { CompetitionRow, Press } from '@/design/components';
 import { EmptyState, NoNetworkArt, NoResultsArt } from '@/design/empty';

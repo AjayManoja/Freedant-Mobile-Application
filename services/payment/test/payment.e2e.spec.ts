@@ -235,7 +235,9 @@ describe('Payment service', () => {
       });
       await t.capture(funding.providerOrderId);
       for (const payer of [w1, w2])
-        await t.capture((await t.order({ competitionId, payerId: payer })).providerOrderId);
+        await t.capture(
+          (await t.order({ competitionId, payerId: payer, title: 'Sketch of the Week' })).providerOrderId,
+        );
 
       const results = {
         competitionId,
@@ -272,6 +274,8 @@ describe('Payment service', () => {
         ['PRIZE', 50_000, true],
         ['ENTRY_FEE', -10_900, false],
       ]);
+      // The wallet line names the competition the money was for.
+      expect(all.body.items[1].description).toBe('Entry — Sketch of the Week');
       const earnings = await t.http
         .get('/v1/wallet/transactions')
         .query({ filter: 'earnings' })

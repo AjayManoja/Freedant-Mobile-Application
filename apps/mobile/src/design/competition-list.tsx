@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { flatten, useCompetitions } from '@/api/hooks';
-import { Loading } from '@/components/ui';
+import { Loading } from '@/design/loading';
 import { errorMessage } from '@/lib/format';
 import { BottomNav } from './bottom-nav';
 import { CompetitionRow } from './components';

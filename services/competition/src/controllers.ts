@@ -23,6 +23,8 @@ import {
 import {
   type DraftUpdateInput,
   draftUpdateSchema,
+  type HostedQuery,
+  hostedQuerySchema,
   type ImageUploadRequest,
   imageUploadRequestSchema,
   type ListQuery,
@@ -31,8 +33,6 @@ import {
   mediaUploadRequestSchema,
   type MySubmissionsQuery,
   mySubmissionsQuerySchema,
-  type PaginationQuery,
-  paginationQuerySchema,
   type ScoreInput,
   scoreSchema,
   type SearchQuery,
@@ -159,8 +159,13 @@ export class HostingController {
   }
 
   @Get('me/competitions')
-  hosted(@CurrentUser() user: AuthUser, @Query(new ZodPipe(paginationQuerySchema)) q: PaginationQuery) {
-    return this.hosting.hosted(user.id, q.cursor, q.limit);
+  hosted(@CurrentUser() user: AuthUser, @Query(new ZodPipe(hostedQuerySchema)) q: HostedQuery) {
+    return this.hosting.hosted(user.id, q);
+  }
+
+  @Get('me/competitions/summary')
+  hostedSummary(@CurrentUser() user: AuthUser) {
+    return this.hosting.hostedSummary(user.id);
   }
 }
 
@@ -220,6 +225,11 @@ export class ParticipationController {
     @Query(new ZodPipe(mySubmissionsQuerySchema)) q: MySubmissionsQuery,
   ) {
     return this.submissions.mine(user.id, q);
+  }
+
+  @Get('me/submissions/summary')
+  mySubmissionsSummary(@CurrentUser() user: AuthUser) {
+    return this.submissions.summary(user.id);
   }
 }
 

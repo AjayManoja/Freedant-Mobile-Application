@@ -1,5 +1,4 @@
 import type { Category, CompetitionSummary, HomeResponse } from '@feedants/shared';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +6,7 @@ import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useHome, useNotify, useUnreadCount } from '@/api/hooks';
 import { requireSignIn, useSession } from '@/auth/session';
-import { ErrorState, Loading } from '@/components/ui';
+import { Loading } from '@/design/loading';
 import {
   Card,
   CompetitionRow,
@@ -19,6 +18,7 @@ import {
   SectionHeader,
   useCountdownLabel,
 } from '@/design/components';
+import { EmptyState, NoNetworkArt } from '@/design/empty';
 import { Gradient } from '@/design/gradient';
 import {
   Bell,
@@ -58,7 +58,16 @@ export default function Home() {
 
   if (home.isPending) return <Loading />;
   if (home.isError && !home.data) {
-    return <ErrorState message={errorMessage(home.error, t)} onRetry={() => void home.refetch()} />;
+    return (
+      <SafeAreaView style={tw`flex-1 bg-canvas items-center justify-center`}>
+        <EmptyState
+          illustration={<NoNetworkArt />}
+          title={t('design.loadFailed')}
+          message={errorMessage(home.error, t)}
+          primary={{ label: t('common.retry'), onPress: () => void home.refetch() }}
+        />
+      </SafeAreaView>
+    );
   }
   return <HomeContent h={home.data!} refreshing={home.isRefetching} onRefresh={() => void home.refetch()} />;
 }

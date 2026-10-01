@@ -222,6 +222,20 @@ describe('Competition: submissions and judging (US-24 … US-29)', () => {
       expect(drafts.body.items).toHaveLength(1);
       const none = await t.http.get('/v1/me/submissions').query({ status: 'WON' }).set(as(d)).expect(200);
       expect(none.body.items).toHaveLength(0);
+      expect(won.body.items[0].competition.categoryName).toEqual(expect.any(String));
+    });
+
+    it('US-26 summarises counts per status and total winnings', async () => {
+      const winner = await t.http.get('/v1/me/submissions/summary').set(as(b)).expect(200);
+      expect(winner.body).toEqual({
+        counts: { ALL: 1, DRAFT: 0, IN_REVIEW: 0, WON: 1, NOT_SELECTED: 0 },
+        totalWinningsPaise: 50_000,
+      });
+      const drafter = await t.http.get('/v1/me/submissions/summary').set(as(d)).expect(200);
+      expect(drafter.body).toEqual({
+        counts: { ALL: 1, DRAFT: 1, IN_REVIEW: 0, WON: 0, NOT_SELECTED: 0 },
+        totalWinningsPaise: 0,
+      });
     });
   });
 

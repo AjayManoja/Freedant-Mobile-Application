@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ApiError } from '@/api/client';
 import { useCompetition, useLeaderboard } from '@/api/hooks';
 import { useSession } from '@/auth/session';
-import { Loading } from '@/components/ui';
+import { Loading } from '@/design/loading';
 import { BottomNav } from '@/design/bottom-nav';
 import { CoverImage, inr, PersonAvatar, Press } from '@/design/components';
 import { EmptyState, NoEntriesArt } from '@/design/empty';

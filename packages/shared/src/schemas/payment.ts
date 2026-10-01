@@ -18,7 +18,20 @@ export const createOrderSchema = z.strictObject({
   /** Part of amountPaise kept by the platform (A-8); 0 for prize funding. */
   platformFeePaise: z.number().int().nonnegative(),
   idempotencyKey: z.string().min(8).max(100),
+  /** The competition's title, so the payer's wallet can say what the money was for. */
+  title: z.string().max(200).optional(),
 });
+
+/** The wallet line for an order's money movement: "Entry — Monsoon Poetry Slam". */
+export function orderDescription(
+  purpose: z.infer<typeof orderPurposeSchema>,
+  title: string | null | undefined,
+  refund = false,
+): string {
+  const what = purpose === 'ENTRY_FEE' ? 'Entry' : 'Prize pool';
+  if (!title) return refund ? `${what} refund` : purpose === 'ENTRY_FEE' ? 'Entry fee' : 'Prize pool funding';
+  return refund ? `Refund — ${title}` : `${what} — ${title}`;
+}
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 
 export interface CreateOrderResponse {

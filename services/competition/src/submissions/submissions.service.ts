@@ -5,6 +5,7 @@ import {
   type MediaUploadRequest,
   mediaKindOf,
   type MySubmissionsQuery,
+  type MySubmissionsSummary,
   type Page,
   submissionChecklist,
   type SubmissionDisplayStatus,
@@ -13,13 +14,14 @@ import {
   type UploadUrlResponse,
 } from '@feedants/shared';
 import { RULES, type Rules } from '../config';
-import type { Competition, Prisma, Registration, Submission } from '../generated/prisma/client';
+import type { Category, Competition, Prisma, Registration, Submission } from '../generated/prisma/client';
 import { outbox } from '../outbox';
 import { PrismaService } from '../prisma.service';
 import { decodeCursor, displayPhase, encodeCursor, iso, windows } from '../views';
 
 const mediaPrefix = (registrationId: string) => `submissions/${registrationId}/`;
-type Row = Submission & { competition: Competition };
+const withCompetition = { competition: { include: { category: true } } } as const;
+type Row = Submission & { competition: Competition & { category: Category | null } };
 
 export function displayStatus(s: Submission, c: Competition): SubmissionDisplayStatus {
   if (s.status === 'DRAFT') return 'DRAFT';
@@ -40,19 +42,19 @@ export class SubmissionsService {
     const reg = await this.ownedConfirmed(creatorId, registrationId);
     let s = await this.prisma.submission.findUnique({
       where: { registrationId },
-      include: { competition: true },
+      include: withCompetition,
     });
     if (!s) {
       try {
         s = await this.prisma.submission.create({
           data: { id: uuidv7(), registrationId, competitionId: reg.competitionId, creatorId },
-          include: { competition: true },
+          include: withCompetition,
         });
       } catch (err) {
         if ((err as { code?: string }).code !== 'P2002') throw err;
         s = await this.prisma.submission.findUniqueOrThrow({
           where: { registrationId },
-          include: { competition: true },
+          include: withCompetition,
         });
       }
     }
@@ -112,7 +114,7 @@ export class SubmissionsService {
     if (count === 0) throw new AppError('SUBMISSION_LOCKED', 'This entry has been submitted');
     const s = await this.prisma.submission.findUniqueOrThrow({
       where: { registrationId },
-      include: { competition: true },
+      include: withCompetition,
     });
     return this.view(s);
   }
@@ -122,7 +124,7 @@ export class SubmissionsService {
     const reg = await this.ownedConfirmed(creatorId, registrationId);
     const s = await this.prisma.submission.findUnique({
       where: { registrationId },
-      include: { competition: true },
+      include: withCompetition,
     });
     if (!s) throw new AppError('SUBMISSION_INCOMPLETE', 'Add your entry before submitting');
     if (s.status === 'SUBMITTED') return this.view(s); // idempotent re-submit
@@ -157,7 +159,7 @@ export class SubmissionsService {
     });
     const updated = await this.prisma.submission.findUniqueOrThrow({
       where: { id: s.id },
-      include: { competition: true },
+      include: withCompetition,
     });
     return this.view(updated);
   }
@@ -191,7 +193,7 @@ export class SubmissionsService {
     }
     const rows = await this.prisma.submission.findMany({
       where: { AND: and },
-      include: { competition: true },
+      include: withCompetition,
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       take: q.limit + 1,
     });
@@ -200,6 +202,32 @@ export class SubmissionsService {
     return {
       items: await Promise.all(page.map((s) => this.view(s))),
       nextCursor: rows.length > q.limit && last ? encodeCursor(last.updatedAt.toISOString(), last.id) : null,
+    };
+  }
+
+  /** US-26: counts behind the filter chips, and what the creator has won so far. */
+  async summary(creatorId: string): Promise<MySubmissionsSummary> {
+    const published = { status: 'RESULTS_PUBLISHED' } as const;
+    const [all, draft, inReview, won, notSelected, winnings] = await Promise.all([
+      this.prisma.submission.count({ where: { creatorId } }),
+      this.prisma.submission.count({ where: { creatorId, status: 'DRAFT' } }),
+      this.prisma.submission.count({
+        where: { creatorId, status: 'SUBMITTED', competition: { status: { not: 'RESULTS_PUBLISHED' } } },
+      }),
+      this.prisma.submission.count({
+        where: { creatorId, status: 'SUBMITTED', prizePaise: { gt: 0 }, competition: published },
+      }),
+      this.prisma.submission.count({
+        where: { creatorId, status: 'SUBMITTED', prizePaise: 0, competition: published },
+      }),
+      this.prisma.submission.aggregate({
+        where: { creatorId, status: 'SUBMITTED', competition: published },
+        _sum: { prizePaise: true },
+      }),
+    ]);
+    return {
+      counts: { ALL: all, DRAFT: draft, IN_REVIEW: inReview, WON: won, NOT_SELECTED: notSelected },
+      totalWinningsPaise: winnings._sum.prizePaise ?? 0,
     };
   }
 
@@ -215,6 +243,7 @@ export class SubmissionsService {
         coverUrl: c.coverUrl,
         submissionEndsAt: iso(c.submissionEndsAt),
         phase: displayPhase(c, new Date()),
+        categoryName: c.category?.name ?? null,
       },
       status: s.status,
       displayStatus: displayStatus(s, c),

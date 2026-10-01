@@ -32,6 +32,7 @@ async function main(): Promise<void> {
         idempotencyKey: o.idempotencyKey,
         providerOrderId: o.providerOrderId,
         providerPaymentId: o.providerPaymentId,
+        title: o.title,
         status: 'CAPTURED' as const,
         capturedAt: o.capturedAt,
         createdAt: new Date(o.capturedAt.getTime() - 60_000),

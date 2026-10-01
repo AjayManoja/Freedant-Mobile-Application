@@ -15,7 +15,7 @@ import { ApiError, newIdempotencyKey } from '@/api/client';
 import { getRegistration, join, useCompetition, useLeaderboard, useNotify } from '@/api/hooks';
 import { requireSignIn, useSession } from '@/auth/session';
 import { syncServerClock, useNow } from '@/components/competition';
-import { Loading } from '@/components/ui';
+import { Loading } from '@/design/loading';
 import { BottomNav } from '@/design/bottom-nav';
 import { BottomSheet, Card, CoverImage, inr, PersonAvatar, Press, Spinner } from '@/design/components';
 import { EmptyState, NoResultsArt } from '@/design/empty';
