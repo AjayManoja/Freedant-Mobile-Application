@@ -1,5 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AppError, uuidv7 } from '@feedants/server-kit';
+import {
+  activeSpanLink,
+  AppError,
+  contextFromTraceparent,
+  currentTraceparent,
+  inSpan,
+  uuidv7,
+} from '@feedants/server-kit';
 import { type CreateOrderInput, type CreateOrderResponse, orderDescription } from '@feedants/shared';
 import type { Order } from '../generated/prisma/client';
 import { EXTERNAL, escrow, LedgerService, PLATFORM } from '../ledger/ledger.service';
@@ -35,7 +42,9 @@ export class OrdersService {
     }
     if (!order) {
       try {
-        order = await this.prisma.order.create({ data: { id: uuidv7(), ...input } });
+        order = await this.prisma.order.create({
+          data: { id: uuidv7(), ...input, traceParent: currentTraceparent() },
+        });
       } catch (err) {
         if ((err as { code?: string }).code !== 'P2002') throw err;
         order = await this.prisma.order.findUniqueOrThrow({
@@ -76,6 +85,14 @@ export class OrdersService {
       this.logger.error({ providerOrderId: e.providerOrderId }, 'Capture for unknown order');
       return;
     }
+    return this.inOrderTrace(order, 'payment.capture', () => this.capture(tx, order, e));
+  }
+
+  private async capture(
+    tx: Tx,
+    order: Order,
+    e: Extract<ProviderEvent, { type: 'payment.captured' }>,
+  ): Promise<void> {
     const { count } = await tx.order.updateMany({
       where: { id: order.id, status: { in: ['CREATED', 'FAILED'] } },
       data: {
@@ -128,6 +145,14 @@ export class OrdersService {
   private async failed(tx: Tx, e: Extract<ProviderEvent, { type: 'payment.failed' }>): Promise<void> {
     const order = await tx.order.findUnique({ where: { providerOrderId: e.providerOrderId } });
     if (!order) return;
+    return this.inOrderTrace(order, 'payment.fail', () => this.fail(tx, order, e));
+  }
+
+  private async fail(
+    tx: Tx,
+    order: Order,
+    e: Extract<ProviderEvent, { type: 'payment.failed' }>,
+  ): Promise<void> {
     const { count } = await tx.order.updateMany({
       where: { id: order.id, status: { in: ['CREATED', 'FAILED'] } },
       data: { status: 'FAILED', failureReason: e.reason.slice(0, 300) },
@@ -148,5 +173,22 @@ export class OrdersService {
         },
       ),
     });
+  }
+
+  /**
+   * The provider's webhook arrives as a new request with no trace context. Applying it inside
+   * the order's own trace (linked to the webhook's span) keeps join → pay → confirm → notify
+   * in one trace (US-36); the events written here inherit it.
+   */
+  private inOrderTrace<T>(order: Order, name: string, fn: () => Promise<T>): Promise<T> {
+    return inSpan(
+      name,
+      {
+        parent: contextFromTraceparent(order.traceParent ?? undefined),
+        links: activeSpanLink(),
+        attributes: { 'feedants.order.id': order.id, 'feedants.order.purpose': order.purpose },
+      },
+      fn,
+    );
   }
 }

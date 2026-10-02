@@ -2,9 +2,27 @@
   "name": "@feedants/server-kit",
   "version": "0.1.0",
   "private": true,
-  "description": "NestJS building blocks shared by every Feedants service: config, logging, errors, auth, rate limits, health, outbox/inbox messaging",
+  "description": "NestJS building blocks shared by every Feedants service: config, logging, tracing, metrics, errors, auth, rate limits, health, outbox/inbox messaging",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./tracing": {
+      "types": "./dist/tracing.d.ts",
+      "default": "./dist/tracing.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "tracing": [
+        "dist/tracing.d.ts"
+      ]
+    }
+  },
   "files": [
     "dist"
   ],
@@ -20,6 +38,19 @@
     "@aws-sdk/s3-presigned-post": "^3.1141.0",
     "@aws-sdk/s3-request-presigner": "^3.1141.0",
     "@feedants/shared": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/core": "^2.11.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.222.0",
+    "@opentelemetry/instrumentation": "^0.222.0",
+    "@opentelemetry/instrumentation-express": "^0.70.0",
+    "@opentelemetry/instrumentation-http": "^0.222.0",
+    "@opentelemetry/instrumentation-ioredis": "^0.70.0",
+    "@opentelemetry/instrumentation-pg": "^0.74.0",
+    "@opentelemetry/instrumentation-undici": "^0.32.0",
+    "@opentelemetry/resources": "^2.11.0",
+    "@opentelemetry/sdk-trace-base": "^2.11.0",
+    "@opentelemetry/sdk-trace-node": "^2.11.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
     "amqp-connection-manager": "^5.0.0",
     "amqplib": "^0.10.9",
     "helmet": "^8.3.0",
@@ -28,6 +59,7 @@
     "nestjs-pino": "^5.2.1",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
+    "prom-client": "^15.1.3",
     "zod": "^4.6.5"
   },
   "peerDependencies": {

@@ -1,0 +1,37 @@
+# Prometheus (US-38): scrapes the services, RabbitMQ and the host, evaluates alerts.yml and
+# sends firing alerts to Alertmanager. Used by the production stack and by the local
+# `monitoring` profile. Everything is on the internal Docker network; nothing is public.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  # http_requests_total, http_request_duration_seconds and Node process metrics.
+  - job_name: services
+    static_configs:
+      - targets: ['identity:3001', 'competition:3002', 'payment:3003', 'notification:3004']
+
+  # Per-queue depth, including every <queue>.dlq.
+  - job_name: rabbitmq
+    metrics_path: /metrics/detailed
+    params:
+      family: [queue_coarse_metrics]
+    static_configs:
+      - targets: ['rabbitmq:15692']
+
+  # Host memory, disk and OOM kills.
+  - job_name: node
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

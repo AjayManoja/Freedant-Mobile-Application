@@ -1,0 +1,8 @@
+[Unit]
+Description=Feedants database backup to S3 (US-39)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/feedants/current/infra/host/backup.sh

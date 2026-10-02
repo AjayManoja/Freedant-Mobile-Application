@@ -1,0 +1,43 @@
+# Jaeger v2 (US-36): receives OTLP from the services and the gateway, keeps traces in memory.
+# Same file locally and in production; JAEGER_MAX_TRACES bounds memory (the container has a
+# hard limit too). Traces are diagnostic, not records: losing them on restart is acceptable.
+service:
+  extensions: [jaeger_storage, jaeger_query, healthcheckv2]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter]
+
+extensions:
+  jaeger_storage:
+    backends:
+      memstore:
+        memory:
+          max_traces: ${env:JAEGER_MAX_TRACES:-20000}
+  jaeger_query:
+    storage:
+      traces: memstore
+    http:
+      endpoint: 0.0.0.0:16686
+    grpc:
+      endpoint: 0.0.0.0:16685
+  healthcheckv2:
+    use_v2: true
+    http:
+      endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317 # the gateway's nginx otel module
+      http:
+        endpoint: 0.0.0.0:4318 # the Node services (OTLP/HTTP protobuf)
+
+processors:
+  batch: {}
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: memstore

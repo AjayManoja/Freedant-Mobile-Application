@@ -1,0 +1,131 @@
+# Unit tests for alerts.yml (the "alert test" in NFR-MT-06):
+#   docker run --rm -v "$PWD/infra/monitoring:/m" -w /m --entrypoint promtool prom/prometheus:v3.15.0 test rules alerts.test.yml
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  # 2 % of competition's requests fail; identity is healthy.
+  - interval: 15s
+    input_series:
+      - series: 'http_requests_total{service="competition",status_code="200"}'
+        values: '0+98x60'
+      - series: 'http_requests_total{service="competition",status_code="500"}'
+        values: '0+2x60'
+      - series: 'http_requests_total{service="identity",status_code="200"}'
+        values: '0+100x60'
+      - series: 'http_requests_total{service="identity",status_code="503"}'
+        values: '0+0x60'
+    alert_rule_test:
+      - eval_time: 4m # above 1 % but not yet for 5 minutes
+        alertname: HighErrorRate
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: HighErrorRate
+        exp_alerts:
+          - exp_labels: { service: competition, severity: page }
+            exp_annotations:
+              summary: 'competition: 2% of requests fail with 5xx'
+              runbook: docs/05-operations/runbooks/alerts.md#higherrorrate
+
+  # 0.5 % errors stays quiet however long it lasts.
+  - interval: 15s
+    input_series:
+      - series: 'http_requests_total{service="payment",status_code="200"}'
+        values: '0+199x60'
+      - series: 'http_requests_total{service="payment",status_code="502"}'
+        values: '0+1x60'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: HighErrorRate
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'up{job="services",instance="payment:3003"}'
+        values: '1 1 0 0 0'
+      - series: 'up{job="services",instance="identity:3001"}'
+        values: '1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels: { job: services, instance: 'payment:3003', severity: page }
+            exp_annotations:
+              summary: payment:3003 is down
+              runbook: docs/05-operations/runbooks/alerts.md#servicedown
+
+  # One message dead-lettered; the busy work queue itself is not an alert.
+  - interval: 1m
+    input_series:
+      - series: 'rabbitmq_detailed_queue_messages_ready{queue="notification.all.dlq"}'
+        values: '0 0 1 1'
+      - series: 'rabbitmq_detailed_queue_messages_ready{queue="notification.all"}'
+        values: '50 50 50 50'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: DeadLetterQueueNotEmpty
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: DeadLetterQueueNotEmpty
+        exp_alerts:
+          - exp_labels: { queue: notification.all.dlq, severity: page }
+            exp_annotations:
+              summary: 1 message(s) dead-lettered in notification.all.dlq
+              runbook: docs/05-operations/runbooks/alerts.md#deadletterqueuenotempty
+
+  - interval: 1m
+    input_series:
+      - series: 'node_memory_MemTotal_bytes'
+        values: '4000x10'
+      - series: 'node_memory_MemAvailable_bytes'
+        values: '200x10'
+      - series: 'node_vmstat_oom_kill'
+        values: '0 0 0 1 1 1 1 1 1 1 1'
+      - series: 'node_filesystem_size_bytes{mountpoint="/"}'
+        values: '1000x10'
+      - series: 'node_filesystem_avail_bytes{mountpoint="/"}'
+        values: '50x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: HostMemoryLow
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: Host has 5% memory available
+              runbook: docs/05-operations/runbooks/alerts.md#hostmemorylow
+      - eval_time: 4m
+        alertname: HostOomKill
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: The kernel killed a process for lack of memory
+              runbook: docs/05-operations/runbooks/alerts.md#hostoomkill
+      - eval_time: 6m
+        alertname: HostDiskLow
+        exp_alerts:
+          - exp_labels: { mountpoint: /, severity: page }
+            exp_annotations:
+              summary: Root filesystem has 5% free
+              runbook: docs/05-operations/runbooks/alerts.md#hostdisklow
+
+  # The last backup succeeded at t=0; the next nightly run never happens.
+  - interval: 1h
+    input_series:
+      - series: 'feedants_backup_last_success_timestamp_seconds'
+        values: '0x30'
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: BackupStale
+        exp_alerts: []
+      - eval_time: 27h
+        alertname: BackupStale
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: Last successful database backup was 1d 3h 0m 0s ago
+              runbook: docs/05-operations/runbooks/alerts.md#backupstale
+      - eval_time: 27h
+        alertname: BackupNeverRan
+        exp_alerts: []

@@ -17,8 +17,10 @@ import { AuthGuard, type AuthedRequest, TokenVerifier } from './auth';
 import { AllExceptionsFilter } from './errors';
 import { HealthController, HealthRegistry } from './health';
 import { ensureRequestId } from './http';
+import { initMetrics, MetricsController } from './metrics';
 import { RateLimitGuard, RateLimiter } from './rate-limit';
 import { createRedis, REDIS } from './redis';
+import { activeTraceIds } from './trace-context';
 
 export interface CoreModuleOptions {
   serviceName: string;
@@ -69,6 +71,7 @@ class RedisLifecycle implements OnModuleInit, OnModuleDestroy {
 @Module({})
 export class CoreModule {
   static forRoot(options: CoreModuleOptions): DynamicModule {
+    initMetrics(options.serviceName);
     return {
       module: CoreModule,
       imports: [
@@ -76,6 +79,9 @@ export class CoreModule {
           pinoHttp: {
             level: options.logLevel,
             base: { service: options.serviceName },
+            // Every line logged inside a traced request or consumed event carries its trace and
+            // span IDs, so a Jaeger trace and its log lines can be found from either side (US-36).
+            mixin: () => activeTraceIds() ?? {},
             genReqId: (req: IncomingMessage, res: ServerResponse) =>
               ensureRequestId(req as Request, res as unknown as Response),
             customProps: (req: IncomingMessage) => ({ userId: (req as AuthedRequest).user?.id }),
@@ -88,11 +94,13 @@ export class CoreModule {
               }),
               res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
             },
-            autoLogging: { ignore: (req: IncomingMessage) => req.url?.startsWith('/health') ?? false },
+            autoLogging: {
+              ignore: (req: IncomingMessage) => /^\/(health|metrics)(\/|$)/.test(req.url ?? ''),
+            },
           },
         }),
       ],
-      controllers: [HealthController],
+      controllers: [HealthController, MetricsController],
       providers: [
         { provide: REDIS, useFactory: () => createRedis(options.redisUrl) },
         RedisLifecycle,

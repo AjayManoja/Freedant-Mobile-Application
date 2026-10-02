@@ -1,0 +1,7 @@
+# Copy to backend.hcl (untracked) and run `terraform init -backend-config=backend.hcl`.
+# Create the bucket once, by hand, with versioning and default encryption on:
+#   aws s3api create-bucket --bucket <name> --region ap-south-1 \
+#     --create-bucket-configuration LocationConstraint=ap-south-1
+#   aws s3api put-bucket-versioning --bucket <name> --versioning-configuration Status=Enabled
+bucket = "feedants-terraform-state-<account-id>"
+region = "ap-south-1"

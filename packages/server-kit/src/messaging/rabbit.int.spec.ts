@@ -1,5 +1,8 @@
+import { context, propagation, trace } from '@opentelemetry/api';
+import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node';
 import amqp from 'amqplib';
 import { randomUUID } from 'node:crypto';
+import { activeTraceIds, inSpan } from '../trace-context';
 import { buildEvent } from './events';
 import { RabbitEventBus } from './rabbit';
 
@@ -84,5 +87,37 @@ describeIfBroker('RabbitEventBus (real broker)', () => {
     });
     await bus.publish(userUpdated());
     await waitFor(() => attempts === 2);
+  });
+
+  it('continues the producer trace in the consumer (US-36)', async () => {
+    const exporter = new InMemorySpanExporter();
+    new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] }).register();
+    try {
+      const queue = `test.${randomUUID()}`;
+      let seen: { traceId: string; spanId: string } | undefined;
+      await bus.subscribe({
+        queue,
+        routingKeys: ['user.deleted'], // a key no earlier (failing) test queue is bound to
+        handler: async () => void (seen = activeTraceIds()),
+      });
+      // Built inside a request span, published later outside it, as the outbox relay does.
+      const { event, traceId } = await inSpan('request', {}, async () => ({
+        event: buildEvent('identity', 'user.deleted', { userId: randomUUID() }),
+        traceId: activeTraceIds()!.traceId,
+      }));
+      await bus.publish(event);
+      await waitFor(() => seen !== undefined);
+
+      expect(seen!.traceId).toBe(traceId);
+      const spans = exporter.getFinishedSpans();
+      const publish = spans.find((s) => s.name === 'user.deleted publish')!;
+      const consume = spans.find((s) => s.name === 'user.deleted process')!;
+      expect(publish.spanContext().traceId).toBe(traceId);
+      expect(consume.parentSpanContext?.spanId).toBe(publish.spanContext().spanId);
+    } finally {
+      trace.disable();
+      context.disable();
+      propagation.disable();
+    }
   });
 });

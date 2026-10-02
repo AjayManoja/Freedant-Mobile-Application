@@ -45,6 +45,20 @@ docker compose -f infra/docker/compose.yaml up -d
 | `http://localhost:15672` | RabbitMQ management (user/password from `.env`) — inspect and replay dead-letter queues |
 | `http://localhost:8025` | Mailpit — sign-in codes land here |
 | `http://localhost:9001` | Object storage console (RustFS, S3-compatible) |
+| `http://localhost:16686` | Jaeger — one trace per request across the gateway, services and RabbitMQ (US-36) |
+
+Alerting is optional locally; it runs the production alert rules, and alert emails land in Mailpit:
+
+```bash
+docker compose -f infra/docker/compose.yaml --profile app --profile monitoring up -d
+```
+
+| URL | What |
+|---|---|
+| `http://localhost:9090` | Prometheus — targets, rules, `http_requests_total` |
+| `http://localhost:9093` | Alertmanager — firing and silenced alerts |
+
+`BackupNeverRan` goes pending locally (there is no nightly backup); ignore it or silence it.
 
 ## 5. Run the services
 
@@ -88,15 +102,9 @@ pnpm dev
 
 See [apps/mobile/README.md](../../apps/mobile/README.md). The app talks to the gateway at `EXPO_PUBLIC_API_URL`; on a physical phone use your machine's LAN IP instead of `localhost`.
 
-## 8. Production signing key
+## 8. Production secrets
 
-Generate an RS256 key for Identity and store it in SSM Parameter Store as a SecureString (never in git):
-
-```bash
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt.pem
-aws ssm put-parameter --name /feedants/prod/identity/JWT_PRIVATE_KEY --type SecureString --value file://jwt.pem
-rm jwt.pem
-```
+Production settings and secrets live in SSM Parameter Store under `/feedants/<environment>/`, never in git. After the first `terraform apply`, `infra/terraform/scripts/generate-secrets.sh` fills the generated ones (database and broker passwords, internal token, OTP pepper, the RS256 signing key); provider credentials are set by hand. See [DEPLOYMENT.md](../05-operations/DEPLOYMENT.md).
 
 ## Troubleshooting
 

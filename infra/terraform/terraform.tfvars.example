@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars (untracked) and fill in.
+domain_name        = "api.feedants.example"
+acme_email         = "ops@feedants.example"
+budget_alert_email = "ops@feedants.example"
+# route53_zone_id  = "Z0123456789ABCDEFGHIJ"   # optional: create the DNS record too
+# cors_origins     = ["https://feedants.example"]

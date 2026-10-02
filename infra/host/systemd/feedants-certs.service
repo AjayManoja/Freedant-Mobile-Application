@@ -1,0 +1,8 @@
+[Unit]
+Description=Renew the Feedants TLS certificate
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/feedants/current/infra/host/renew-certs.sh

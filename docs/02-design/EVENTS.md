@@ -16,10 +16,13 @@ A full `asyncapi.yaml` is generated from the NestJS event definitions in Phase 2
   "type": "competition.published",
   "occurredAt": "2026-09-28T10:15:00Z",
   "producer": "competition",
-  "traceId": "uuid — propagated from the originating HTTP request (NFR-MT-04)",
+  "traceId": "uuid — request ID of the originating HTTP request, for log correlation (NFR-MT-04)",
+  "traceparent": "00-<trace-id>-<span-id>-01 — W3C trace context of the producing span (US-36); optional",
   "data": { "...": "event-specific payload, self-contained (no callback needed to read it)" }
 }
 ```
+
+The relay's publish span and the consumer's process span are children of `traceparent`, which is also copied into the AMQP `traceparent` header, so one Jaeger trace follows a request through the outbox and the broker into every consumer.
 
 Every consumer records `id` in its `inbox_events` table before acting (§5.2 of [HLD.md](HLD.md)); redelivery is a guaranteed possibility (at-least-once), never treated as exceptional.
 

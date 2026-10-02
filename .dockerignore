@@ -13,3 +13,4 @@ docs
 infra/terraform
 apps/mobile/*
 !apps/mobile/package.json
+tools

@@ -1,0 +1,17 @@
+# Local Alertmanager (compose `monitoring` profile): alerts arrive as email in Mailpit
+# (http://localhost:8025), so the whole alert path can be exercised on a laptop.
+route:
+  receiver: email
+  group_by: [alertname, service, queue]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 1h
+
+receivers:
+  - name: email
+    email_configs:
+      - to: oncall@feedants.local
+        from: alerts@feedants.local
+        smarthost: mailpit:1025
+        require_tls: false
+        send_resolved: true

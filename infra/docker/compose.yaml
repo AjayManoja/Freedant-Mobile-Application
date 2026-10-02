@@ -2,12 +2,20 @@
 #
 #   docker compose -f infra/docker/compose.yaml up -d                 # infrastructure only
 #   docker compose -f infra/docker/compose.yaml --profile app up -d   # + all services behind Nginx
+#   ... --profile app --profile monitoring up -d                       # + Prometheus and Alertmanager
+#
+# Traces: Jaeger UI at http://localhost:16686 (US-36). Alerts (monitoring profile): Prometheus
+# http://localhost:9090, Alertmanager http://localhost:9093, alert emails in Mailpit.
 #
 # Infrastructure ports are bound to 127.0.0.1 so `pnpm dev` on the host can reach them; the
 # production stack (Phase 5) publishes nothing except Nginx (NFR-SC-01).
 # Values come from infra/docker/.env (copy .env.example); nothing secret is committed.
 
 name: feedants
+
+# Every service exports traces to Jaeger (OTLP/HTTP).
+x-telemetry: &telemetry
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
 
 x-service: &service
   profiles: [app]
@@ -193,17 +201,20 @@ services:
     <<: *service
     build: { context: ../.., dockerfile: infra/docker/service.Dockerfile, args: { SERVICE: identity } }
     environment:
+      <<: *telemetry
       PORT: 3001
       DATABASE_URL: postgresql://identity:${IDENTITY_DB_PASSWORD}@postgres:5432/identity
     depends_on:
       identity-migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
+      jaeger: { condition: service_started }
 
   competition:
     <<: *service
     build: { context: ../.., dockerfile: infra/docker/service.Dockerfile, args: { SERVICE: competition } }
     environment:
+      <<: *telemetry
       PORT: 3002
       DATABASE_URL: postgresql://competition:${COMPETITION_DB_PASSWORD}@postgres:5432/competition
       PAYMENT_INTERNAL_URL: http://payment:3003
@@ -211,37 +222,91 @@ services:
       competition-migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
+      jaeger: { condition: service_started }
 
   payment:
     <<: *service
     build: { context: ../.., dockerfile: infra/docker/service.Dockerfile, args: { SERVICE: payment } }
     environment:
+      <<: *telemetry
       PORT: 3003
       DATABASE_URL: postgresql://payment:${PAYMENT_DB_PASSWORD}@postgres:5432/payment
     depends_on:
       payment-migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
+      jaeger: { condition: service_started }
 
   notification:
     <<: *service
     build: { context: ../.., dockerfile: infra/docker/service.Dockerfile, args: { SERVICE: notification } }
     environment:
+      <<: *telemetry
       PORT: 3004
       DATABASE_URL: postgresql://notification:${NOTIFICATION_DB_PASSWORD}@postgres:5432/notification
     depends_on:
       notification-migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
+      jaeger: { condition: service_started }
 
   gateway:
-    image: nginx:1.30-alpine
+    image: nginx:1.30-alpine-otel # official image with the OpenTelemetry module
     profiles: [app]
     restart: unless-stopped
-    volumes: [../nginx/nginx.conf:/etc/nginx/nginx.conf:ro]
+    command: ['nginx', '-c', '/etc/nginx/feedants/nginx.conf', '-g', 'daemon off;']
+    volumes: [../nginx:/etc/nginx/feedants:ro]
     ports: ['127.0.0.1:8080:80']
     networks: [internal]
-    depends_on: [identity, competition, payment, notification]
+    depends_on: [identity, competition, payment, notification, jaeger]
+
+  # Traces from the gateway and every service (US-36). In-memory: traces are lost on restart.
+  jaeger:
+    image: jaegertracing/jaeger:2.21.0
+    restart: unless-stopped
+    command: ['--config', '/etc/jaeger/config.yaml']
+    volumes: [../jaeger/config.yaml:/etc/jaeger/config.yaml:ro]
+    environment:
+      JAEGER_MAX_TRACES: 20000
+    ports:
+      - '127.0.0.1:16686:16686' # UI
+      - '127.0.0.1:4318:4318' # OTLP/HTTP, for services run with `pnpm dev`
+    networks: [internal]
+    deploy:
+      resources:
+        limits: { memory: 256m }
+
+  # Alerting (US-38), optional locally: the same rules as production, emails go to Mailpit.
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    profiles: [monitoring]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2d
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports: ['127.0.0.1:9090:9090']
+    networks: [internal]
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    profiles: [monitoring]
+    restart: unless-stopped
+    command: ['--config.file=/etc/alertmanager/alertmanager.yml']
+    volumes: [../monitoring/alertmanager.local.yml:/etc/alertmanager/alertmanager.yml:ro]
+    ports: ['127.0.0.1:9093:9093']
+    networks: [internal]
+
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    profiles: [monitoring]
+    restart: unless-stopped
+    command: ['--path.rootfs=/host']
+    pid: host
+    volumes: ['/:/host:ro'] # no rslave: WSL's root isn't a shared mount (production uses it)
+    networks: [internal]
 
 networks:
   internal: {}

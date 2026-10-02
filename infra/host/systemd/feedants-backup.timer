@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly Feedants database backup (RPO 24 h)
+
+[Timer]
+# 02:00 IST, the quietest hour.
+OnCalendar=*-*-* 20:30:00 UTC
+RandomizedDelaySec=10m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

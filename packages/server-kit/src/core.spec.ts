@@ -180,6 +180,22 @@ describe('CoreModule HTTP stack', () => {
     const res = await request(app.getHttpServer()).get('/health/ready').expect(200);
     expect(res.body.checks).toEqual({ redis: 'up' });
   });
+
+  it('exposes request metrics by route template and status, without auth (US-38)', async () => {
+    await request(app.getHttpServer()).get('/boom').expect(500);
+    await request(app.getHttpServer()).get('/conflict').expect(409);
+    await request(app.getHttpServer()).get('/no-such-route/123').expect(404);
+    const res = await request(app.getHttpServer()).get('/metrics').expect(200);
+    expect(res.headers['content-type']).toContain('text/plain');
+    const series = (labels: string) => `http_requests_total{${labels},service="test"}`;
+    expect(res.text).toContain(series('method="GET",route="/boom",status_code="500"'));
+    expect(res.text).toContain(series('method="GET",route="/conflict",status_code="409"'));
+    // Unknown paths share one label instead of minting a series per raw URL.
+    expect(res.text).toContain(series('method="GET",route="unmatched",status_code="404"'));
+    expect(res.text).not.toContain('no-such-route');
+    expect(res.text).not.toContain('route="/metrics"');
+    expect(res.text).toContain('process_resident_memory_bytes');
+  });
 });
 
 describe('uuidv7', () => {

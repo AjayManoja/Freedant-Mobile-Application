@@ -1,0 +1,119 @@
+# Alert rules (US-38, NFR-MT-06, NFR-RL-06). Each alert's runbook section explains what it
+# means and what to do: docs/05-operations/runbooks/alerts.md. Unit tests: alerts.test.yml
+# (`promtool test rules`, run in CI).
+groups:
+  - name: api
+    rules:
+      - alert: HighErrorRate
+        # 5xx share of a service's requests above 1 %, continuously for 5 minutes.
+        expr: |
+          sum by (service) (rate(http_requests_total{status_code=~"5.."}[1m]))
+            / sum by (service) (rate(http_requests_total[1m]))
+            > 0.01
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: '{{ $labels.service }}: {{ $value | humanizePercentage }} of requests fail with 5xx'
+          runbook: docs/05-operations/runbooks/alerts.md#higherrorrate
+
+      - alert: ServiceDown
+        # A service that can't be scraped serves nothing either; the gateway answers 502.
+        expr: up{job="services"} == 0
+        for: 1m
+        labels:
+          severity: page
+        annotations:
+          summary: '{{ $labels.instance }} is down'
+          runbook: docs/05-operations/runbooks/alerts.md#servicedown
+
+  - name: messaging
+    rules:
+      - alert: DeadLetterQueueNotEmpty
+        # Any message here exhausted its retries and needs a person (inspect, fix, replay).
+        expr: max by (queue) (rabbitmq_detailed_queue_messages_ready{queue=~".+[.]dlq"}) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: '{{ $value }} message(s) dead-lettered in {{ $labels.queue }}'
+          runbook: docs/05-operations/runbooks/alerts.md#deadletterqueuenotempty
+
+      - alert: BrokerMetricsMissing
+        expr: up{job="rabbitmq"} == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: RabbitMQ can't be scraped, so dead-letter alerts are blind
+          runbook: docs/05-operations/runbooks/alerts.md#brokermetricsmissing
+
+  - name: host
+    rules:
+      - alert: HostMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: 'Host has {{ $value | humanizePercentage }} memory available'
+          runbook: docs/05-operations/runbooks/alerts.md#hostmemorylow
+
+      - alert: HostOomKill
+        expr: increase(node_vmstat_oom_kill[5m]) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: The kernel killed a process for lack of memory
+          runbook: docs/05-operations/runbooks/alerts.md#hostoomkill
+
+      - alert: HostDiskLow
+        expr: |
+          node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} < 0.10
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: 'Root filesystem has {{ $value | humanizePercentage }} free'
+          runbook: docs/05-operations/runbooks/alerts.md#hostdisklow
+
+      - alert: HostDiskFillingUp
+        # Early warning: at the last 6 hours' rate the disk is full within a day.
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[6h], 24 * 3600) < 0
+          and node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} < 0.25
+        for: 30m
+        labels:
+          severity: warn
+        annotations:
+          summary: Root filesystem will be full within 24 hours at the current rate
+          runbook: docs/05-operations/runbooks/alerts.md#hostdisklow
+
+      - alert: HostMetricsMissing
+        expr: up{job="node"} == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: node-exporter can't be scraped, so host alerts are blind
+          runbook: docs/05-operations/runbooks/alerts.md#hostmetricsmissing
+
+  - name: backups
+    rules:
+      - alert: BackupStale
+        # RPO ≤ 24 h (NFR-RL-07): the nightly backup (infra/host/backup.sh) must have succeeded
+        # within the last 26 hours. backup.sh writes the timestamp for node-exporter.
+        expr: time() - feedants_backup_last_success_timestamp_seconds > 26 * 3600
+        labels:
+          severity: page
+        annotations:
+          summary: 'Last successful database backup was {{ $value | humanizeDuration }} ago'
+          runbook: docs/05-operations/runbooks/alerts.md#backupstale
+
+      - alert: BackupNeverRan
+        expr: absent(feedants_backup_last_success_timestamp_seconds)
+        for: 26h
+        labels:
+          severity: page
+        annotations:
+          summary: No successful database backup has been recorded
+          runbook: docs/05-operations/runbooks/alerts.md#backupstale

@@ -72,6 +72,56 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  infra:
+    name: Infrastructure checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+      - name: Terraform format and validate
+        working-directory: infra/terraform
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+      - name: Terraform security scan (Trivy)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: infra/terraform
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+      - name: Host scripts (ShellCheck)
+        run: shellcheck -x infra/host/*.sh infra/terraform/scripts/*.sh
+      - name: Alert rules (promtool unit tests, US-38)
+        run: |
+          docker run --rm -v "$PWD/infra/monitoring:/etc/prometheus" -w /etc/prometheus \
+            --entrypoint promtool prom/prometheus:v3.15.0 check config prometheus.yml
+          docker run --rm -v "$PWD/infra/monitoring:/m" -w /m \
+            --entrypoint promtool prom/prometheus:v3.15.0 test rules alerts.test.yml
+          docker run --rm -v "$PWD/infra/monitoring:/m" \
+            --entrypoint amtool prom/alertmanager:v0.34.1 check-config /m/alertmanager.local.yml
+      - name: Gateway config (nginx -t, local and production)
+        run: |
+          tmp=$(mktemp -d) && mkdir -p "$tmp/live/feedants"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=ci \
+            -keyout "$tmp/live/feedants/privkey.pem" -out "$tmp/live/feedants/fullchain.pem"
+          hosts=$(for h in identity competition payment notification jaeger; do printf -- '--add-host %s:127.0.0.1 ' "$h"; done)
+          for conf in nginx.conf nginx.prod.conf; do
+            docker run --rm $hosts -v "$PWD/infra/nginx:/etc/nginx/feedants:ro" -v "$tmp:/etc/letsencrypt:ro" \
+              nginx:1.30-alpine-otel nginx -t -c "/etc/nginx/feedants/$conf"
+          done
+      - name: Compose files
+        run: |
+          cp infra/docker/.env.example infra/docker/.env
+          docker compose -f infra/docker/compose.yaml --profile app --profile monitoring config -q
+          export FEEDANTS_HOME=$(mktemp -d) && touch "$FEEDANTS_HOME/.env"
+          printf '%s\n' REGISTRY=ghcr.io/ci IDENTITY_TAG=ci COMPETITION_TAG=ci PAYMENT_TAG=ci NOTIFICATION_TAG=ci \
+            >"$FEEDANTS_HOME/release.env"
+          docker compose -f infra/docker/compose.prod.yaml --env-file "$FEEDANTS_HOME/release.env" \
+            --profile migrate --profile tools config -q
+
   images:
     name: Image build + Trivy (${{ matrix.service }})
     runs-on: ubuntu-latest

@@ -1,8 +1,10 @@
 import { Logger } from '@nestjs/common';
+import { context } from '@opentelemetry/api';
 import { EVENT_EXCHANGE, type EventEnvelope, eventEnvelopeSchema } from '@feedants/shared';
 import amqp, { type AmqpConnectionManager, type ChannelWrapper } from 'amqp-connection-manager';
 import type { ConfirmChannel, ConsumeMessage, Options } from 'amqplib';
 import { requestContext } from '../context';
+import { contextFromTraceparent, currentTraceparent, inSpan, SpanKind } from '../trace-context';
 import { EventBus, type SubscribeOptions } from './bus';
 
 export interface RabbitBusOptions {
@@ -13,6 +15,15 @@ export interface RabbitBusOptions {
 }
 
 const RETRY_HEADER = 'x-retries';
+const TRACEPARENT_HEADER = 'traceparent';
+
+const messagingAttributes = (event: EventEnvelope, extra: Record<string, string | number> = {}) => ({
+  'messaging.system': 'rabbitmq',
+  'messaging.destination.name': EVENT_EXCHANGE,
+  'messaging.rabbitmq.destination.routing_key': event.type,
+  'messaging.message.id': event.id,
+  ...extra,
+});
 
 /**
  * RabbitMQ topic-exchange bus (EVENTS.md §2). Each queue gets a delayed retry queue and a
@@ -41,14 +52,32 @@ export class RabbitEventBus extends EventBus {
     return this.connection.isConnected();
   }
 
+  /**
+   * The publish span is a child of the trace that wrote the event (its envelope
+   * `traceparent`), not of the relay's poll, so the broker hop shows up in the request's trace.
+   */
   async publish(event: EventEnvelope): Promise<void> {
-    await this.publisher.publish(EVENT_EXCHANGE, event.type, Buffer.from(JSON.stringify(event)), {
-      persistent: true,
-      contentType: 'application/json',
-      messageId: event.id,
-      type: event.type,
-      headers: event.traceId ? { 'x-trace-id': event.traceId } : {},
-    });
+    await inSpan(
+      `${event.type} publish`,
+      {
+        kind: SpanKind.PRODUCER,
+        parent: contextFromTraceparent(event.traceparent),
+        attributes: messagingAttributes(event),
+      },
+      async () => {
+        const traceparent = currentTraceparent();
+        await this.publisher.publish(EVENT_EXCHANGE, event.type, Buffer.from(JSON.stringify(event)), {
+          persistent: true,
+          contentType: 'application/json',
+          messageId: event.id,
+          type: event.type,
+          headers: {
+            ...(event.traceId ? { 'x-trace-id': event.traceId } : {}),
+            ...(traceparent ? { [TRACEPARENT_HEADER]: traceparent } : {}),
+          },
+        });
+      },
+    );
   }
 
   async subscribe({ queue, routingKeys, handler, prefetch = 10 }: SubscribeOptions): Promise<void> {
@@ -95,11 +124,35 @@ export class RabbitEventBus extends EventBus {
       return;
     }
 
+    // Retries keep the original headers, so every attempt is a child of the same publish span.
+    // The whole attempt runs in that context, so failure logs below carry the trace ID too.
+    const header = msg.properties.headers?.[TRACEPARENT_HEADER];
+    const parent = contextFromTraceparent(typeof header === 'string' ? header : event.traceparent);
+    await context.with(parent, () => this.process(ch, msg, queue, handler, event));
+  }
+
+  private async process(
+    ch: ConfirmChannel,
+    msg: ConsumeMessage,
+    queue: string,
+    handler: SubscribeOptions['handler'],
+    event: EventEnvelope,
+  ): Promise<void> {
+    const retries = Number(msg.properties.headers?.[RETRY_HEADER] ?? 0);
     try {
-      await requestContext.run({ requestId: event.traceId ?? event.id }, () => handler(event));
+      await inSpan(
+        `${event.type} process`,
+        {
+          kind: SpanKind.CONSUMER,
+          attributes: messagingAttributes(event, {
+            'messaging.consumer.group.name': queue,
+            'messaging.rabbitmq.retries': retries,
+          }),
+        },
+        () => requestContext.run({ requestId: event.traceId ?? event.id }, () => handler(event)),
+      );
       ch.ack(msg);
     } catch (err) {
-      const retries = Number(msg.properties.headers?.[RETRY_HEADER] ?? 0);
       const exhausted = retries >= this.options.maxRetries;
       this.logger.warn(
         { err, queue, eventId: event.id, eventType: event.type, retries },
@@ -117,7 +170,11 @@ export class RabbitEventBus extends EventBus {
       } catch (sendErr) {
         // Could not park the message: return it to the queue rather than lose it.
         this.logger.error({ err: sendErr, queue }, 'Failed to schedule retry; requeueing');
-        ch.nack(msg, false, true);
+        try {
+          ch.nack(msg, false, true);
+        } catch {
+          // Channel already closed (shutdown, broker restart): the broker requeues unacked messages.
+        }
       }
     }
   }

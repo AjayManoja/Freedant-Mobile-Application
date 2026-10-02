@@ -2,10 +2,14 @@ import { type EventEnvelope, type EventPayload, eventSchemas, type EventType } f
 import { requestContext } from '../context';
 import { AppError } from '../errors';
 import { uuidv7 } from '../ids';
+import { currentTraceparent } from '../trace-context';
 
 export type Producer = EventEnvelope['producer'];
 
-/** Builds a validated envelope; the trace ID comes from the current request or consumed event. */
+/**
+ * Builds a validated envelope. The request ID and trace context come from the current request
+ * or consumed event, so the event continues that trace when the outbox relays it later.
+ */
 export function buildEvent<T extends EventType>(
   producer: Producer,
   type: T,
@@ -18,6 +22,7 @@ export function buildEvent<T extends EventType>(
     occurredAt: new Date().toISOString(),
     producer,
     traceId: requestContext.get()?.requestId,
+    traceparent: currentTraceparent(),
     data: parsed,
   };
 }

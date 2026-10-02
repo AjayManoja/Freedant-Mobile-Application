@@ -159,6 +159,8 @@ flowchart TB
 
 One host runs everything via Compose (A-32: an accepted single point of failure for the MVP, revisited at the ~100k-user signal in [SCALING.md](SCALING.md)). Services are stateless — no in-memory session or cache that would break if a second instance started (NFR-SL-01) — so the deployment can grow to multiple containers per service behind a load balancer without a code change, only a Compose/Terraform change.
 
+As built (Phase 5): the same host also runs Jaeger, Prometheus, Alertmanager and node-exporter ([ADR 0007](../adr/0007-self-hosted-observability-on-the-host.md)); deploys, rollback, alerts and backups are described in [DEPLOYMENT.md](../05-operations/DEPLOYMENT.md).
+
 ## 5. Consistency patterns
 
 These four patterns are mandatory across all four services (PROJECT_PLAN); this section specifies exactly how, referencing the tables in [ERD.md](ERD.md).

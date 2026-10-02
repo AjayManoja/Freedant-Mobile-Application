@@ -1,0 +1,278 @@
+# Production stack on the single EC2 host (HLD §4, US-37). Driven by infra/host/deploy.sh:
+#
+#   docker compose -f compose.prod.yaml --env-file /opt/feedants/.env --env-file /opt/feedants/release.env ...
+#
+# - Images come from GHCR, one tag (commit SHA) per service in release.env, so services can be
+#   rolled, and rolled back, one at a time.
+# - Secrets and settings come from SSM Parameter Store, rendered into /opt/feedants/.env.
+# - Host paths default to /opt/feedants (FEEDANTS_HOME overrides it, e.g. for CI checks).
+# - Config files are mounted from /opt/feedants/config (copied from the release being deployed),
+#   a stable path, so a deploy reloads nginx and Prometheus instead of recreating them.
+# - Only the gateway publishes ports (80/443, NFR-SC-01). Operator UIs (Jaeger, Prometheus,
+#   Alertmanager, RabbitMQ) bind to 127.0.0.1 and are reached with SSM port forwarding.
+# - Object storage is real S3 through the instance role; mail goes to the SMTP provider.
+
+name: feedants
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: 10m, max-file: '5' }
+
+# Built from SSM values here so the broker password lives in one parameter.
+x-service-env: &service-env
+  RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+
+x-service: &service
+  restart: unless-stopped
+  env_file: ['${FEEDANTS_HOME:-/opt/feedants}/.env']
+  networks: [internal]
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: [no-new-privileges:true]
+  logging: *logging
+  healthcheck:
+    test:
+      [
+        'CMD',
+        'node',
+        '-e',
+        "fetch('http://127.0.0.1:'+process.env.PORT+'/health/live').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+      ]
+    interval: 10s
+    timeout: 3s
+    retries: 5
+    start_period: 20s
+  deploy:
+    resources:
+      limits: { memory: 256m }
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+    rabbitmq: { condition: service_healthy }
+
+x-migrate: &migrate
+  profiles: [migrate]
+  restart: 'no'
+  networks: [internal]
+  logging: *logging
+  depends_on:
+    postgres: { condition: service_healthy }
+
+services:
+  identity-migrate:
+    <<: *migrate
+    image: ${REGISTRY}/feedants-identity-migrate:${IDENTITY_TAG}
+    environment:
+      DATABASE_URL: postgresql://identity:${IDENTITY_DB_PASSWORD}@postgres:5432/identity
+
+  competition-migrate:
+    <<: *migrate
+    image: ${REGISTRY}/feedants-competition-migrate:${COMPETITION_TAG}
+    environment:
+      DATABASE_URL: postgresql://competition:${COMPETITION_DB_PASSWORD}@postgres:5432/competition
+
+  payment-migrate:
+    <<: *migrate
+    image: ${REGISTRY}/feedants-payment-migrate:${PAYMENT_TAG}
+    environment:
+      DATABASE_URL: postgresql://payment:${PAYMENT_DB_PASSWORD}@postgres:5432/payment
+
+  notification-migrate:
+    <<: *migrate
+    image: ${REGISTRY}/feedants-notification-migrate:${NOTIFICATION_TAG}
+    environment:
+      DATABASE_URL: postgresql://notification:${NOTIFICATION_DB_PASSWORD}@postgres:5432/notification
+
+  identity:
+    <<: *service
+    image: ${REGISTRY}/feedants-identity:${IDENTITY_TAG}
+    environment:
+      <<: *service-env
+      PORT: 3001
+      DATABASE_URL: postgresql://identity:${IDENTITY_DB_PASSWORD}@postgres:5432/identity
+      SERVICE_VERSION: ${IDENTITY_TAG}
+
+  competition:
+    <<: *service
+    image: ${REGISTRY}/feedants-competition:${COMPETITION_TAG}
+    environment:
+      <<: *service-env
+      PORT: 3002
+      DATABASE_URL: postgresql://competition:${COMPETITION_DB_PASSWORD}@postgres:5432/competition
+      PAYMENT_INTERNAL_URL: http://payment:3003
+      SERVICE_VERSION: ${COMPETITION_TAG}
+
+  payment:
+    <<: *service
+    image: ${REGISTRY}/feedants-payment:${PAYMENT_TAG}
+    environment:
+      <<: *service-env
+      PORT: 3003
+      DATABASE_URL: postgresql://payment:${PAYMENT_DB_PASSWORD}@postgres:5432/payment
+      SERVICE_VERSION: ${PAYMENT_TAG}
+
+  notification:
+    <<: *service
+    image: ${REGISTRY}/feedants-notification:${NOTIFICATION_TAG}
+    environment:
+      <<: *service-env
+      PORT: 3004
+      DATABASE_URL: postgresql://notification:${NOTIFICATION_DB_PASSWORD}@postgres:5432/notification
+      SERVICE_VERSION: ${NOTIFICATION_TAG}
+
+  gateway:
+    image: nginx:1.30-alpine-otel
+    restart: unless-stopped
+    command: ['nginx', '-c', '/etc/nginx/feedants/nginx.prod.conf', '-g', 'daemon off;']
+    volumes:
+      - ${FEEDANTS_HOME:-/opt/feedants}/config/nginx:/etc/nginx/feedants:ro
+      - ${FEEDANTS_HOME:-/opt/feedants}/letsencrypt:/etc/letsencrypt:ro
+      - ${FEEDANTS_HOME:-/opt/feedants}/certbot-www:/var/www/certbot:ro
+    ports: ['80:80', '443:443']
+    networks: [internal]
+    logging: *logging
+    deploy:
+      resources:
+        limits: { memory: 128m }
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      COMPETITION_DB_PASSWORD: ${COMPETITION_DB_PASSWORD}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ${FEEDANTS_HOME:-/opt/feedants}/config/postgres:/docker-entrypoint-initdb.d:ro
+    networks: [internal]
+    logging: *logging
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits: { memory: 768m }
+
+  redis:
+    image: redis:8.8-alpine
+    restart: unless-stopped
+    command:
+      ['redis-server', '--appendonly', 'yes', '--maxmemory', '128mb', '--maxmemory-policy', 'volatile-lru']
+    volumes: [redis-data:/data]
+    networks: [internal]
+    logging: *logging
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits: { memory: 192m }
+
+  rabbitmq:
+    image: rabbitmq:4.2-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes: [rabbitmq-data:/var/lib/rabbitmq]
+    ports: ['127.0.0.1:15672:15672'] # management UI: inspect and replay dead-letter queues
+    networks: [internal]
+    logging: *logging
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { memory: 384m }
+
+  jaeger:
+    image: jaegertracing/jaeger:2.21.0
+    restart: unless-stopped
+    command: ['--config', '/etc/jaeger/config.yaml']
+    volumes: ['${FEEDANTS_HOME:-/opt/feedants}/config/jaeger:/etc/jaeger:ro']
+    environment:
+      JAEGER_MAX_TRACES: 10000
+    ports: ['127.0.0.1:16686:16686']
+    networks: [internal]
+    logging: *logging
+    deploy:
+      resources:
+        limits: { memory: 256m }
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=2GB
+    volumes:
+      - ${FEEDANTS_HOME:-/opt/feedants}/config/monitoring:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    ports: ['127.0.0.1:9090:9090']
+    networks: [internal]
+    logging: *logging
+    deploy:
+      resources:
+        limits: { memory: 256m }
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    restart: unless-stopped
+    command: ['--config.file=/etc/alertmanager/alertmanager.yml', '--storage.path=/alertmanager']
+    volumes:
+      - ${FEEDANTS_HOME:-/opt/feedants}/run/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports: ['127.0.0.1:9093:9093']
+    networks: [internal]
+    logging: *logging
+    deploy:
+      resources:
+        limits: { memory: 64m }
+
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+      # backup.sh writes feedants_backup_last_success_timestamp_seconds here (BackupStale alert).
+      # Its own mount: under /host the path crosses /opt/feedants (mode 700), unreadable to nobody.
+      - --collector.textfile.directory=/textfile
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+      - ${FEEDANTS_HOME:-/opt/feedants}/metrics:/textfile:ro
+    networks: [internal]
+    logging: *logging
+    deploy:
+      resources:
+        limits: { memory: 64m }
+
+  # One-shot, run by infra/host/renew-certs.sh: `docker compose run --rm certbot renew ...`.
+  certbot:
+    image: certbot/certbot:v5.8.0
+    profiles: [tools]
+    volumes:
+      - ${FEEDANTS_HOME:-/opt/feedants}/letsencrypt:/etc/letsencrypt
+      - ${FEEDANTS_HOME:-/opt/feedants}/certbot-www:/var/www/certbot
+
+networks:
+  internal: {}
+
+volumes:
+  postgres-data: {}
+  redis-data: {}
+  rabbitmq-data: {}
+  prometheus-data: {}
+  alertmanager-data: {}

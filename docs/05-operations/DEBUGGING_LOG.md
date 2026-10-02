@@ -2,6 +2,13 @@
 
 Every real bug that cost time: **symptom → cause → fix → prevention**. Newest first.
 
+## 2026-10-02 — A consumer could crash the process while the broker channel was closing
+
+- **Symptom:** after adding a fourth RabbitMQ integration test, every test in the file failed with `IllegalOperationError: Channel closed`, thrown from `RabbitEventBus` after the tests had finished.
+- **Cause:** the new test published `user.updated`, which also reached an earlier test's always-failing queue. That message was still cycling through retries when `afterAll` closed the bus; scheduling the next retry failed, and the fallback `ch.nack()` threw on the closed channel inside a fire-and-forget promise. In a service the same race at shutdown or a broker restart would surface as an unhandled rejection.
+- **Fix:** the fallback `nack` is guarded. When the channel is already gone the broker requeues the unacked message by itself, so there is nothing left to do. The new test uses a routing key no other test binds.
+- **Prevention:** integration tests that share a broker use their own routing keys; any broker call made after a failure is treated as able to fail too.
+
 ## 2026-09-28 — Full test runs sometimes hung forever after all tests passed
 
 - **Symptom:** `pnpm test` across the monorepo occasionally never finished; a `jest` process and a lone `postgres.exe --forkchild="io_worker"` were left running, while the postmaster that spawned it was gone.

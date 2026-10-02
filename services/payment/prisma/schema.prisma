@@ -68,6 +68,8 @@ model Order {
   idempotencyKey    String       @unique @map("idempotency_key")
   /// Competition title at order time, for wallet descriptions.
   title             String?
+  /// W3C traceparent of the join/fund request, so the later capture joins its trace.
+  traceParent       String?      @map("trace_parent")
   providerOrderId   String?      @unique @map("provider_order_id")
   providerPaymentId String?      @map("provider_payment_id")
   status            OrderStatus  @default(CREATED)

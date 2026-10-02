@@ -1,16 +1,17 @@
-# Handoff — mobile design port
+# Handoff
 
-Updated 2026-10-02 at the end of the session that finished the port. Branch: `feat/mobile-design-port`.
+Updated 2026-10-02 at the end of the session that added tracing, deployment, alerting and backups
+(US-36…39). Branch: `feat/mobile-design-port`.
 
 ## 1. Where things stand
 
 - **Backend (Phase 2/3 services):** identity, competition, payment, notification are complete for
   user stories US-01…US-33, with e2e tests (all passing; `pnpm turbo run test --filter='!@feedants/mobile'`).
-  US-34 (local stack + seed) and US-35 (CI) are done. US-36 tracing (sprint S7) and US-37…39
-  (deploy, alerts, backups — Phase 5) are not started.
+  US-34 (local stack + seed) and US-35 (CI) are done. **US-36…39 are built and verified locally**
+  (§1a); production has not been provisioned yet (§1b).
 - **Mobile app:** every screen is ported to the design (`design/reference` + `design/prototype/src`)
   — see §3. The old kit `src/components/ui.tsx` is deleted; everything uses `src/design/`.
-- **Backend additions for the port (this session):**
+- **Backend additions for the port (previous session):**
   - `GET /v1/me/submissions/summary` → counts per status + total winnings (`MySubmissionsSummary`).
   - `GET /v1/me/competitions?filter=LIVE|JUDGING|DRAFT|CLOSED` and `GET /v1/me/competitions/summary`
     (`HostedSummary`: counts, total entries, revenue). Cancelled competitions report ₹0 revenue.
@@ -21,6 +22,37 @@ Updated 2026-10-02 at the end of the session that finished the port. Branch: `fe
   - **The ledger is append-only (DB trigger)**, so rows written before this change still say
     "Entry fee". A fresh volume + reseed shows titled lines for the demo data:
     `docker compose -f infra/docker/compose.yaml down -v`, then `up` and the seed loop in §4.
+
+## 1a. Tracing, deployment, alerts, backups (this session)
+
+- **US-36 tracing.** `@feedants/server-kit/tracing` starts OpenTelemetry (each service's
+  `src/tracing.ts` is imported first in `main.ts`; off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set).
+  The envelope has a new optional `traceparent`; the bus adds publish/process spans and AMQP
+  headers; Payment stores the join's trace on the order (migration `20261003000000_order_trace_parent`)
+  so the webhook capture continues it. Gateway is `nginx:1.30-alpine-otel`; config split into
+  `http.conf` + `routes.conf`. Every log line has `traceId`/`spanId` (pino mixin). **Verified:** one
+  Jaeger trace for join → pay → confirm → notify spans gateway, competition, identity, payment,
+  RabbitMQ and notification (74 spans).
+- **US-38 alerts.** `/metrics` on every service (`http_requests_total`, duration histogram, process
+  metrics; internal only). Prometheus + Alertmanager + node-exporter: `infra/monitoring/`, rules
+  unit-tested with `promtool` (in CI). **Verified:** a message in a DLQ emailed an alert to Mailpit
+  in ~25 s and a RESOLVED mail after purging.
+- **US-37 deploy.** Terraform (`infra/terraform`, validated, Trivy-clean), `compose.prod.yaml`,
+  host scripts (`infra/host`: deploy with per-service rollback, smoke, certs), `.github/workflows/deploy.yml`
+  (GHCR + Trivy + OIDC + SSM). CI gained an `infra` job. Docs: `docs/05-operations/DEPLOYMENT.md`,
+  `runbooks/alerts.md`, ADR 0007.
+- **US-39 backups.** Nightly `backup.sh` → S3, `restore.sh`, `runbooks/restore.md`. **Local drill
+  recorded:** restore in 18 s, all row counts identical, ledger sums to 0.
+- Loose ends from the port: `@expo/vector-icons` removed; 135 unused i18n keys pruned.
+
+## 1b. Not done (needs the user's AWS account, a domain and provider credentials)
+
+- `terraform apply`, secrets (`infra/terraform/scripts/generate-secrets.sh` + SMTP/Razorpay by hand),
+  DNS, GitHub environment `production` with its variables, first deploy: DEPLOYMENT.md §2.
+- First production restore drill against S3 (add a row to the table in `runbooks/restore.md`).
+- UptimeRobot check on `/gateway/health`.
+- Also still open in the plan: Phase 4 hardening (k6, OWASP ZAP, TEST_STRATEGY/REPORT) and the
+  APK via EAS Build.
 
 ## 2. Decisions the user made (keep to them)
 
@@ -57,11 +89,8 @@ ConfirmDialog, FormField, Input**), `empty.tsx`, `bottom-nav.tsx`, `competition-
 | Sign-in (email → code → name) | `LoginPage.tsx`, `OtpVerificationPage.tsx`, `SignUpPage.tsx` | ✅ verified end to end; 6-box code auto-submits; password/phone/Google omitted |
 | Onboarding, Splash | `components/Onboarding.tsx`, `SplashScreen.tsx` | ✅ swipeable 4 slides (copy corrected where it over-claimed); splash 1.9 s + 0.5 s fade |
 
-### Loose ends
+### Notes
 
-- `@expo/vector-icons` is no longer imported anywhere; remove it from `apps/mobile/package.json`
-  if nothing else needs it.
-- Old i18n sections (`competitions.*`, parts of `submission.*`, `profile.*`) have unused keys.
 - On Windows Chrome the 🇮🇳 emoji renders as "IN" (no flag glyphs); phones show the flag.
 - Splash and onboarding were captured but not measured (the references are mid-animation).
 
@@ -78,6 +107,11 @@ ConfirmDialog, FormField, Input**), `empty.tsx`, `bottom-nav.tsx`, `competition-
 - Too many sign-in codes → dev rate limit. Clear it:
   `for k in $(docker compose -f infra/docker/compose.yaml exec -T redis redis-cli --scan --pattern 'rl:otp-*'); do docker compose -f infra/docker/compose.yaml exec -T redis redis-cli del "$k"; done`
 - Design comparison tools: `tools/design-parity/README.md` (`node setup-ref.mjs` once).
+- Traces: Jaeger `http://localhost:16686`. Alerting: add `--profile monitoring` (Prometheus `:9090`,
+  Alertmanager `:9093`, alert mails in Mailpit; `BackupNeverRan` goes pending locally, ignore it).
+- node-exporter locally mounts `/` without `rslave` (WSL's root isn't a shared mount).
+- Restore drill locally: `FEEDANTS_COMPOSE="docker compose -f infra/docker/compose.yaml" BACKUP_DEST=/tmp/b bash infra/host/backup.sh`
+  then `... restore.sh latest --yes` (from the Ubuntu terminal).
 
 ## 5. Checks before calling a screen done
 
@@ -89,5 +123,5 @@ The brand splash covers the first ~2.4 s after the bundle renders; pass `--after
 
 ## 6. Prompt to start the next session
 
-> Continue Feedants. Read `docs/HANDOFF.md` first. The mobile design port is complete; next is
-> US-36 (tracing) and the Phase 5 stories (US-37…39), or the loose ends in §3.
+> Continue Feedants. Read `docs/HANDOFF.md` first. US-01…39 are built; production isn't provisioned
+> yet (§1b, DEPLOYMENT.md §2). Next: provision AWS and deploy, or Phase 4 hardening (k6, ZAP).

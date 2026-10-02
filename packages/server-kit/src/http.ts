@@ -5,6 +5,7 @@ import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import { requestContext } from './context';
+import { metricsMiddleware } from './metrics';
 
 const REQUEST_ID = /^[A-Za-z0-9._-]{8,64}$/;
 type WithRequestId = Request & { requestId?: string };
@@ -39,6 +40,7 @@ export function configureHttp(app: INestApplication, options: HttpOptions): void
   express.use((req: Request, res: Response, next: NextFunction) =>
     requestContext.run({ requestId: ensureRequestId(req, res) }, next),
   );
+  express.use(metricsMiddleware);
   express.use(helmet());
   express.useBodyParser('json', { limit: options.jsonLimit ?? '100kb' });
   express.enableCors({

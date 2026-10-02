@@ -1,0 +1,33 @@
+#!/bin/bash
+# First-boot setup of the Feedants host (Amazon Linux 2023). Rendered by Terraform as EC2
+# user_data; runs once. Everything after this (release files, settings, containers, timers)
+# is done by infra/host/deploy.sh on each deploy.
+set -euxo pipefail
+
+dnf install -y docker jq gettext tar gzip
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL "https://github.com/docker/compose/releases/download/v${compose_version}/docker-compose-linux-x86_64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+systemctl enable --now docker
+
+# A little swap so a memory spike slows the host down instead of OOM-killing Postgres.
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap defaults 0 0' >>/etc/fstab
+fi
+
+install -d -m 700 /opt/feedants
+cat >/opt/feedants/host.env <<'EOF'
+ENVIRONMENT=${environment}
+AWS_REGION=${region}
+REPOSITORY=${repository}
+REGISTRY=${registry}
+BACKUP_BUCKET=${backup_bucket}
+DOMAIN=${domain}
+ACME_EMAIL=${acme_email}
+EOF
+chmod 600 /opt/feedants/host.env

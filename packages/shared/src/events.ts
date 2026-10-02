@@ -6,7 +6,10 @@ export const eventEnvelopeSchema = z.object({
   type: z.string(),
   occurredAt: z.iso.datetime(),
   producer: z.enum(['identity', 'competition', 'payment']),
+  /** Request ID of the originating HTTP request, for log correlation. */
   traceId: z.string().optional(),
+  /** W3C trace context of the span that produced the event, so consumers join its trace (US-36). */
+  traceparent: z.string().optional(),
   data: z.unknown(),
 });
 export type EventEnvelope<T = unknown> = Omit<z.infer<typeof eventEnvelopeSchema>, 'data'> & { data: T };
