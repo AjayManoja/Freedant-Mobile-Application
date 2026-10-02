@@ -71,6 +71,17 @@ docker compose -f infra/docker/compose.yaml --profile app up -d --build
 
 Each service waits for a one-shot `<service>-migrate` job that applies its migrations first.
 
+On a machine with little memory (a WSL VM with 8 GB or less), build the images one at a time instead: eight parallel `pnpm install`s can run it out of memory. Then start the stack without `--build`:
+
+```bash
+for t in identity identity-migrate competition competition-migrate payment payment-migrate notification notification-migrate; do
+  docker compose -f infra/docker/compose.yaml --profile app build "$t" > "/tmp/build-$t.log" 2>&1 || { echo "$t failed, see /tmp/build-$t.log"; break; }
+done
+docker compose -f infra/docker/compose.yaml --profile app up -d
+```
+
+Keep Docker's disk small: after a failed build, delete the half-built images and run `docker builder prune -af` before trying again, and clear the build cache after a successful build too (a full build leaves 11–13 GB of cache behind).
+
 Then load the demo data (people and competitions from the Figma prototype, in every phase):
 
 ```bash

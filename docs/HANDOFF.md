@@ -3,46 +3,65 @@
 Updated 2026-10-02 at the end of the session that added tracing, deployment, alerting and backups
 (US-36…39). Branch: `feat/mobile-design-port`.
 
-## 0. First: rebuild the local environment (WSL was deleted)
+## 0. Local environment: rebuilt from scratch on 2026-10-02
 
-On 2026-10-02, repeated image rebuilds grew the WSL disk (`D:\WSL\Ubuntu-24.04\ext4.vhdx`) to
-fill D: completely (97.6 GB, 0 bytes free), and WSL stopped starting (`E_FAIL`). Compacting with
-diskpart freed nothing (the freed blocks were never trimmed), and the disk couldn't be mounted to
-trim it, so the user is deleting the distro to free D:. All code is pushed (`0764d34`) and lives
-on C:, as does `infra/docker/.env`; only Docker images, build cache and the local demo data are lost.
+**What happened.** Repeated image rebuilds grew the WSL disk (`D:\WSL\Ubuntu-24.04\ext4.vhdx`)
+until D: had 0 bytes free and WSL stopped starting (`E_FAIL`). Compacting freed nothing (the
+freed blocks were never trimmed) and the disk couldn't be mounted to trim it, so the user deleted
+the distro. Code, `infra/docker/.env` and the repo were on C: and unaffected; Docker images, build
+cache and the local demo data were lost (the demo data is re-seedable).
 
-Rebuild, in this order:
+**Current state:**
 
-1. **Reinstall Ubuntu on D:** (keep C: free):
-   `wsl --install -d Ubuntu-24.04 --location D:\WSL\Ubuntu-24.04`, then make the disk return freed
-   space to D: automatically: `wsl --shutdown; wsl --manage Ubuntu-24.04 --set-sparse true`.
-2. **Install Docker Engine** in Ubuntu (Docker's apt repository: `docker-ce`, `docker-ce-cli`,
-   `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`); `sudo usermod -aG docker $USER`.
-3. **Check space first:** `Get-PSDrive C,D` (Windows) and `df -h /` (Ubuntu). A full build needs
-   roughly 10-15 GB on D:.
-4. **Build once:**
-   `cd /mnt/c/Users/Dell/Projects/feedants && docker compose -f infra/docker/compose.yaml --profile app up -d --build > /tmp/build.log 2>&1; echo "exit $?"`
-   then the seed loop in §4. Add `--profile monitoring` only when alerting is needed.
-5. **Verify** with the smoke test (`bash infra/host/smoke.sh http://localhost:8080`) and one
-   join-and-pay trace in Jaeger. This also verifies the last code change: the Express `{/*splat}`
-   span filter was reverted because it corrupted `http.route`. Routes must read
-   `POST /v1/competitions/:id/join`, not `{/*splat}{/*splat}/...`.
+- Ubuntu 24.04 reinstalled on `D:\WSL\Ubuntu-24.04`; default user `ajay` (no password set yet;
+  set one with `wsl -u root passwd ajay` if you need `sudo` interactively).
+- Docker Engine 29.8 and Compose v5.5 from Docker's apt repository; `ajay` is in the `docker` group.
+- All eight images are built, and the build cache was cleared afterwards:
 
-**Docker hygiene (the user's rule): never rebuild blindly.**
+  | Image | Size (`docker image ls`) | Notes |
+  |---|---|---|
+  | `feedants-<service>` × 4 | ~365 MB each | was ~772 MB; app folder 102 MB, the rest is the Node Alpine base |
+  | `feedants-<service>-migrate` × 4 | ~573 MB each | the install layer is identical across all four, so all four take ~0.6 GB of disk |
+  | All eight together | 1.07 GB on disk | shared base and install layers |
 
-- Batch changes, then build once. Never pipe build output through `tail` alone; it hides failures
-  (that is how a failed rebuild went unnoticed this session). Check the exit code.
-- After a failed build, or before a rebuild: delete the old images and cache, then build again:
-  `docker compose -f infra/docker/compose.yaml --profile app down`,
-  `docker image rm $(docker image ls --filter "reference=feedants-*" -q)`, `docker builder prune -af`,
-  `docker image prune -f`.
-- Check free space on D: before every build. Every so often, `sudo fstrim -av` in Ubuntu followed
-  by `wsl --shutdown` hands freed space back to D: (sparse mode does this automatically).
-- `tools/` is now in `.dockerignore`; Chrome profiles under `tools/design-parity` broke a build
-  context load ("cannot allocate memory").
-- To-do: the `migrate` target is `FROM build`, so each migration image carries the whole build
-  stage (all dependencies). A slim stage with only the Prisma CLI, the schema and the migrations
-  would cut four large images down to a few MB each.
+- **Not yet done after the rebuild:** starting the stack, seeding, and re-running the smoke test and
+  the join-and-pay trace check. Next session: `docker compose -f infra/docker/compose.yaml --profile app up -d`
+  (no `--build`; the images exist), the seed loop in §4, `bash infra/host/smoke.sh http://localhost:8080`,
+  and one join in Jaeger. Span names must read `POST /v1/competitions/:id/join`; the Express
+  `{/*splat}` span filter was reverted because it corrupted `http.route`.
+- Sparse mode for the WSL disk is **off on purpose**: WSL only accepts it with `--allow-unsafe`
+  (Microsoft flags it as a corruption risk). Free space goes back to D: by trim and compaction (below).
+
+**Image changes made during the rebuild** (`infra/docker/service.Dockerfile`):
+
+- The `migrate` target was `FROM build` (the whole build stage). It is now a slim stage: only the
+  Prisma CLI and `dotenv`, pinned by `infra/docker/migrate-package.mjs` to the versions the lockfile
+  resolved, plus the service's `prisma/` folder and `prisma.config.ts`.
+- `infra/docker/prune-runtime.mjs` runs after `pnpm deploy`. `@prisma/client` declares `prisma`
+  and `typescript` as optional peers; pnpm resolved them from the services' dev dependencies, so
+  production bundles carried the Prisma CLI (Studio, PGlite, `effect`) and TypeScript. The script
+  keeps only packages reachable through real dependencies and required peers (388 → 92 MB), and
+  drops Prisma's query-compiler builds for databases we don't use.
+- Open: CI's image-size budget (`ci.yml`, < 200 MB) still fails at ~348 MB. The Node binary alone
+  is 126 MB, so meeting it needs the app folder under ~50 MB. Next steps if wanted: also prune
+  `*.d.ts` (22 MB), dependency source maps (18 MB) and Prisma's edge/"small" compiler variants,
+  or raise the budget with a reason.
+
+**Docker rules (the user's): never rebuild blindly; keep images and the disk small.**
+
+- Batch changes, then build once. Build **one image at a time**: eight parallel `pnpm install`s
+  exhausted the 7 GB WSL VM and failed. Write the log to a file and check the real exit code;
+  never trust `| tail`. From Windows, run build commands through a script file inside WSL, because
+  quoting through Git Bash mangled `$?` and `/tmp` paths this session.
+- Before a rebuild, or after a failed build: delete the old images and the build cache first:
+  `docker image rm <feedants images>`, `docker builder prune -af`, `docker image prune -f`. After a
+  successful build, clear the build cache again (it reached 11-13 GB per full build).
+- Check free space before building: `Get-PSDrive C,D` and `df -h /`.
+- To give freed space back to D: run `sudo fstrim -av` in Ubuntu, then `wsl --shutdown`, then
+  compact the disk from an admin prompt (`diskpart`: `select vdisk file="D:\WSL\Ubuntu-24.04\ext4.vhdx"`,
+  `attach vdisk readonly`, `compact vdisk`, `detach vdisk`).
+- `tools/` is in `.dockerignore`; Chrome profiles under `tools/design-parity` broke a build-context
+  load ("cannot allocate memory").
 
 ## 1. Where things stand
 
@@ -140,8 +159,10 @@ ConfirmDialog, FormField, Input**), `empty.tsx`, `bottom-nav.tsx`, `competition-
 - **Docker Engine runs inside WSL** (Ubuntu-24.04 on `D:\WSL\Ubuntu-24.04`). Watch free space
   on D: as well as C: (§0).
 - WSL stops the distro (and the stack) when no session is open. Keep an Ubuntu terminal open.
-- Stack (from the Ubuntu terminal): `cd /mnt/c/Users/Dell/Projects/feedants && docker compose -f infra/docker/compose.yaml --profile app up -d --build`
-- Rebuild one service after backend changes: `... --profile app up -d --build --no-deps competition`
+- Stack (from the Ubuntu terminal): `cd /mnt/c/Users/Dell/Projects/feedants && docker compose -f infra/docker/compose.yaml --profile app up -d`
+  (images already built; add `--build` only after code changes, following the Docker rules in §0).
+- Rebuild one service after backend changes: `... --profile app build competition` (log to a file,
+  check the exit code), then `... --profile app up -d --no-deps competition`.
 - Seed demo data: `for s in identity competition payment notification; do docker compose -f infra/docker/compose.yaml --profile app run --rm --no-deps "$s" node dist/seed.js; done`
 - Mobile (Windows): `cd apps/mobile && npx expo start --web --port 8081` (add `--clear` if the bundle looks stale).
 - Demo login: `riya@example.com`; codes arrive in Mailpit `http://localhost:8025`. API `:8080`.
@@ -164,7 +185,7 @@ The brand splash covers the first ~2.4 s after the bundle renders; pass `--after
 
 ## 6. Prompt to start the next session
 
-> Continue Feedants. Read `docs/HANDOFF.md` first. Start with §0: rebuild the local environment
-> (WSL was deleted to free D:) and keep to the Docker hygiene rules there. US-01…39 are built;
-> production isn't provisioned yet (§1b, DEPLOYMENT.md §2). Then: provision AWS and deploy, or
-> Phase 4 hardening (k6, ZAP).
+> Continue Feedants. Read `docs/HANDOFF.md` first. The local environment was rebuilt and all images
+> exist (§0): start the stack, seed it and run the smoke test and a join-and-pay trace, keeping to
+> the Docker rules in §0. US-01…39 are built; production isn't provisioned yet (§1b,
+> DEPLOYMENT.md §2). Then: provision AWS and deploy, or Phase 4 hardening (k6, ZAP).

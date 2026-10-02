@@ -18,11 +18,23 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter "@feedants/${SERVICE}..."
 RUN pnpm --filter "@feedants/${SERVICE}..." build
 # Self-contained production bundle: the service's dist plus production dependencies only.
-RUN pnpm --filter "@feedants/${SERVICE}" deploy --prod --legacy /out
+RUN pnpm --filter "@feedants/${SERVICE}" deploy --prod --legacy /out \
+    && node infra/docker/prune-runtime.mjs /out
+# Inputs of the slim migrate image: schema, migrations, config, pinned CLI versions.
+RUN mkdir -p /migrate && cd "services/${SERVICE}" \
+    && cp -r prisma prisma.config.ts /migrate/ \
+    && node /repo/infra/docker/migrate-package.mjs /migrate
 
-FROM build AS migrate
-ARG SERVICE
-WORKDIR /repo/services/${SERVICE}
+# Only what `prisma migrate deploy` needs, not the build stage's toolchain and dependencies.
+FROM node:${NODE_VERSION}-alpine AS migrate
+WORKDIR /app
+# Install before copying the service's schema: every service pins the same versions, so this
+# layer is identical across the four migrate images and stored once.
+COPY --from=build /migrate/package.json ./
+RUN npm install --omit=dev --no-audit --no-fund \
+    && npm cache clean --force && rm -rf /root/.cache /tmp/*
+COPY --from=build /migrate/prisma ./prisma
+COPY --from=build /migrate/prisma.config.ts ./
 USER node
 CMD ["npx", "prisma", "migrate", "deploy"]
 

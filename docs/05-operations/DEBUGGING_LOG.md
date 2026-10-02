@@ -2,6 +2,27 @@
 
 Every real bug that cost time: **symptom → cause → fix → prevention**. Newest first.
 
+## 2026-10-02 — Runtime images carried the Prisma CLI and TypeScript (772 MB)
+
+- **Symptom:** each service's runtime image was ~772 MB, far over CI's 200 MB budget; `node_modules` held `prisma`, `@prisma/studio-core`, `@prisma/dev`, `effect`, `@electric-sql/pglite` and `typescript`.
+- **Cause:** `@prisma/client` declares `prisma` and `typescript` as *optional* peer dependencies. Both are dev dependencies of every service, so pnpm resolves the peers, and `pnpm deploy --prod` keeps them, with the CLI's whole dependency tree.
+- **Fix:** `infra/docker/prune-runtime.mjs` runs after the deploy. It keeps only packages reachable through dependencies and required peers, and drops Prisma's query-compiler builds for unused databases (bundle 388 → 92 MB, image ~365 MB). The `migrate` target became a slim stage with only the Prisma CLI, instead of the whole build stage.
+- **Prevention:** look at `docker history` and `du` inside an image whenever its size jumps. The CI budget still fails (Node alone is 126 MB); see HANDOFF §0 for the remaining options.
+
+## 2026-10-02 — Parallel image builds failed with "pnpm install … exit code: 1"
+
+- **Symptom:** `docker compose --profile app build` failed in one service's `pnpm install` step. Building that service alone succeeded.
+- **Cause:** Compose builds all eight targets at once. Eight concurrent `pnpm install`s sharing one cache mount ran the 7 GB WSL VM out of resources.
+- **Fix:** build one image at a time (LOCAL_SETUP §5); each `-migrate` target reuses its service's cached build stage.
+- **Prevention:** build sequentially on small machines; log every build to a file and check the real exit code.
+
+## 2026-10-02 — WSL stopped starting because the Docker disk filled D
+
+- **Symptom:** WSL failed with `Wsl/Service/CreateInstance/E_FAIL`; D: had 0 bytes free and the distro's `ext4.vhdx` was 97.6 GB.
+- **Cause:** repeated `docker compose up --build` runs, each leaving superseded images and gigabytes of BuildKit cache. A VHDX grows but never shrinks on its own. One rebuild also failed unnoticed because its output went through `| tail`, and a later one loaded `tools/design-parity` Chrome profiles into the build context.
+- **Fix:** compacting freed nothing, because the blocks freed inside ext4 had never been trimmed. Mounting the disk to trim it needed free space for the journal replay. The distro was deleted and reinstalled (all code was on C: and pushed). `tools/` is now in `.dockerignore`.
+- **Prevention:** the Docker rules in HANDOFF §0: build once and sequentially, clear old images and the build cache before rebuilding and after building, check free space first, and trim + compact the VHDX now and then.
+
 ## 2026-10-02 — A consumer could crash the process while the broker channel was closing
 
 - **Symptom:** after adding a fourth RabbitMQ integration test, every test in the file failed with `IllegalOperationError: Channel closed`, thrown from `RabbitEventBus` after the tests had finished.
