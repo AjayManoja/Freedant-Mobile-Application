@@ -3,6 +3,47 @@
 Updated 2026-10-02 at the end of the session that added tracing, deployment, alerting and backups
 (US-36…39). Branch: `feat/mobile-design-port`.
 
+## 0. First: rebuild the local environment (WSL was deleted)
+
+On 2026-10-02, repeated image rebuilds grew the WSL disk (`D:\WSL\Ubuntu-24.04\ext4.vhdx`) to
+fill D: completely (97.6 GB, 0 bytes free), and WSL stopped starting (`E_FAIL`). Compacting with
+diskpart freed nothing (the freed blocks were never trimmed), and the disk couldn't be mounted to
+trim it, so the user is deleting the distro to free D:. All code is pushed (`0764d34`) and lives
+on C:, as does `infra/docker/.env`; only Docker images, build cache and the local demo data are lost.
+
+Rebuild, in this order:
+
+1. **Reinstall Ubuntu on D:** (keep C: free):
+   `wsl --install -d Ubuntu-24.04 --location D:\WSL\Ubuntu-24.04`, then make the disk return freed
+   space to D: automatically: `wsl --shutdown; wsl --manage Ubuntu-24.04 --set-sparse true`.
+2. **Install Docker Engine** in Ubuntu (Docker's apt repository: `docker-ce`, `docker-ce-cli`,
+   `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`); `sudo usermod -aG docker $USER`.
+3. **Check space first:** `Get-PSDrive C,D` (Windows) and `df -h /` (Ubuntu). A full build needs
+   roughly 10-15 GB on D:.
+4. **Build once:**
+   `cd /mnt/c/Users/Dell/Projects/feedants && docker compose -f infra/docker/compose.yaml --profile app up -d --build > /tmp/build.log 2>&1; echo "exit $?"`
+   then the seed loop in §4. Add `--profile monitoring` only when alerting is needed.
+5. **Verify** with the smoke test (`bash infra/host/smoke.sh http://localhost:8080`) and one
+   join-and-pay trace in Jaeger. This also verifies the last code change: the Express `{/*splat}`
+   span filter was reverted because it corrupted `http.route`. Routes must read
+   `POST /v1/competitions/:id/join`, not `{/*splat}{/*splat}/...`.
+
+**Docker hygiene (the user's rule): never rebuild blindly.**
+
+- Batch changes, then build once. Never pipe build output through `tail` alone; it hides failures
+  (that is how a failed rebuild went unnoticed this session). Check the exit code.
+- After a failed build, or before a rebuild: delete the old images and cache, then build again:
+  `docker compose -f infra/docker/compose.yaml --profile app down`,
+  `docker image rm $(docker image ls --filter "reference=feedants-*" -q)`, `docker builder prune -af`,
+  `docker image prune -f`.
+- Check free space on D: before every build. Every so often, `sudo fstrim -av` in Ubuntu followed
+  by `wsl --shutdown` hands freed space back to D: (sparse mode does this automatically).
+- `tools/` is now in `.dockerignore`; Chrome profiles under `tools/design-parity` broke a build
+  context load ("cannot allocate memory").
+- To-do: the `migrate` target is `FROM build`, so each migration image carries the whole build
+  stage (all dependencies). A slim stage with only the Prisma CLI, the schema and the migrations
+  would cut four large images down to a few MB each.
+
 ## 1. Where things stand
 
 - **Backend (Phase 2/3 services):** identity, competition, payment, notification are complete for
@@ -96,8 +137,8 @@ ConfirmDialog, FormField, Input**), `empty.tsx`, `bottom-nav.tsx`, `competition-
 
 ## 4. Running everything (this machine)
 
-- **Docker Engine runs inside WSL** (Ubuntu-24.04, moved to `D:\WSL\Ubuntu-24.04` because the
-  images filled C:). Watch free space on C:.
+- **Docker Engine runs inside WSL** (Ubuntu-24.04 on `D:\WSL\Ubuntu-24.04`). Watch free space
+  on D: as well as C: (§0).
 - WSL stops the distro (and the stack) when no session is open. Keep an Ubuntu terminal open.
 - Stack (from the Ubuntu terminal): `cd /mnt/c/Users/Dell/Projects/feedants && docker compose -f infra/docker/compose.yaml --profile app up -d --build`
 - Rebuild one service after backend changes: `... --profile app up -d --build --no-deps competition`
@@ -123,5 +164,7 @@ The brand splash covers the first ~2.4 s after the bundle renders; pass `--after
 
 ## 6. Prompt to start the next session
 
-> Continue Feedants. Read `docs/HANDOFF.md` first. US-01…39 are built; production isn't provisioned
-> yet (§1b, DEPLOYMENT.md §2). Next: provision AWS and deploy, or Phase 4 hardening (k6, ZAP).
+> Continue Feedants. Read `docs/HANDOFF.md` first. Start with §0: rebuild the local environment
+> (WSL was deleted to free D:) and keep to the Docker hygiene rules there. US-01…39 are built;
+> production isn't provisioned yet (§1b, DEPLOYMENT.md §2). Then: provision AWS and deploy, or
+> Phase 4 hardening (k6, ZAP).
