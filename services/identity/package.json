@@ -18,9 +18,9 @@
     "@feedants/seed-data": "workspace:*",
     "@feedants/server-kit": "workspace:*",
     "@feedants/shared": "workspace:*",
-    "@nestjs/common": "^11.2.6",
-    "@nestjs/core": "^11.2.6",
-    "@nestjs/platform-express": "^11.2.6",
+    "@nestjs/common": "^11.2.7",
+    "@nestjs/core": "^11.2.7",
+    "@nestjs/platform-express": "^11.2.7",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "ioredis": "^5.11.1",
@@ -29,21 +29,21 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "tslib": "^2.8.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@feedants/testing": "workspace:*",
-    "@nestjs/testing": "^11.2.6",
+    "@nestjs/testing": "^11.2.7",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
-    "@types/node": "^24.19.0",
+    "@types/node": "^24.19.2",
     "@types/nodemailer": "^7.0.12",
     "@types/supertest": "^7.2.1",
     "dotenv": "^17.2.0",
     "ioredis-mock": "^8.13.1",
     "jest": "^30.5.2",
     "prisma": "^7.10.0",
-    "supertest": "^7.3.0",
+    "supertest": "^7.3.1",
     "typescript": "~5.9.3"
   },
   "files": [
